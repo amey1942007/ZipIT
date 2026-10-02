@@ -49,6 +49,14 @@ describe('foundation', () => {
     })
   })
 
+  it('renders the comic 404 for an unknown route', () => {
+    window.location.hash = '#/no-such-page'
+    render(<App />)
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByText("That page doesn't exist.")).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go home' })).toHaveAttribute('href', '#/')
+  })
+
   it('shows Live on the admin leaderboard without a freeze control', async () => {
     window.location.hash = '#/admin/leaderboard'
     render(<App />)
