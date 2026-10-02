@@ -2,13 +2,13 @@
 @import "./styles/tokens.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/orbitron/700.css";
-@import "@fontsource/orbitron/900.css";
-@import "@fontsource/exo-2/400.css";
-@import "@fontsource/exo-2/500.css";
-@import "@fontsource/exo-2/600.css";
-@import "@fontsource/space-mono/400.css";
-@import "@fontsource/space-mono/700.css";
+@import "@fontsource/chakra-petch/600.css";
+@import "@fontsource/chakra-petch/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -29,11 +29,19 @@ body {
 }
 
 h1,
-h2,
-h3,
-h4 {
+h2 {
   font-family: var(--zi-font-display);
   font-weight: 700;
+  letter-spacing: var(--zi-tracking-heading);
+  line-height: var(--zi-leading-heading);
+}
+
+h3,
+h4,
+h2.text-h3,
+h2.text-h4 {
+  font-family: var(--zi-font-display);
+  font-weight: 600;
   letter-spacing: var(--zi-tracking-heading);
   line-height: var(--zi-leading-heading);
 }

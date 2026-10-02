@@ -178,10 +178,14 @@ export function ArenaPage() {
     <PageFrame title="Arena">
       {noRuns ? <p className="rounded-xl border border-border bg-surface px-4 py-3">No runs yet</p> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-gold px-3 py-1 text-sm text-gold">
+        <span className="rounded-full border border-gold px-3 py-1 font-display text-xs font-semibold tracking-[0.12em] text-gold">
           {mode === 'demo' ? 'Demo Zip with solution' : mode === 'fresh' ? 'New Zip' : 'Saved run'}
         </span>
-        {mode === 'demo' ? <span className="rounded-full bg-gold px-3 py-1 text-sm font-semibold text-on-gold">Demo solution</span> : null}
+        {mode === 'demo' ? (
+          <span className="rounded-full bg-gold px-3 py-1 font-display text-xs font-semibold tracking-[0.12em] text-on-gold">
+            Demo solution
+          </span>
+        ) : null}
       </div>
       {note ? <p className="text-text-muted">{note}</p> : null}
       <div ref={rowRef} className="grid w-full min-w-0 items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -200,12 +204,13 @@ export function ArenaPage() {
             head={frame.head}
             cell={cell}
             showLine={mode !== 'fresh'}
+            playing={playing && mode !== 'fresh'}
           />
         ) : (
           <p className="text-text-muted">Loading the board…</p>
         )}
         <div ref={controlsRef} className="grid min-w-0 max-w-md gap-4">
-          <p className="font-mono text-text-muted">
+          <p className="font-mono font-bold text-text-muted tabular-nums">
             {REPLAY_SCORE_LABEL}: {score == null ? '—' : score}
           </p>
           {mode === 'demo' ? <p className="text-sm text-text-muted">Official score is hidden on the demo.</p> : null}

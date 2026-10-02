@@ -36,7 +36,7 @@ const links = [
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn('font-display text-h4 font-black tracking-[0.02em]', className)}>
+    <span className={cn('font-display text-h4 font-bold tracking-[0.01em]', className)}>
       <span className="text-text">Zip</span>
       <span className="text-gold">IT</span>
     </span>
@@ -61,7 +61,7 @@ export function CodePlaygroundButton({
   const label = compact ? 'Playground' : 'Code Playground'
   const classes = cn(
     'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gold px-6 font-semibold text-on-gold',
-    hero && 'h-14 px-8 font-display text-h4 shadow-glow-gold',
+    hero && 'h-14 px-8 font-display text-h4 font-bold shadow-glow-gold',
     !hero && 'shadow-glow-gold',
     className,
   )
@@ -240,7 +240,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       <div className={cn('pb-24 sm:pb-0', arenaMobile && 'max-sm:pb-28')}>{children}</div>
       {session && !(arenaMobile && mobile) ? (
         <footer className="border-t border-border px-4 py-8 text-center">
-          <p className="text-xs font-semibold tracking-[0.12em] text-text-muted">{ORGANISER_LINE}</p>
+          <p className="font-display text-xs font-semibold tracking-[0.12em] text-text-muted">{ORGANISER_LINE}</p>
           <p className="text-xs text-text-muted">{ORGANISER_SUBLINE}</p>
         </footer>
       ) : null}

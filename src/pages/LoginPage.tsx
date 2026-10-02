@@ -135,7 +135,7 @@ export function LoginPage() {
           </Button>
         </form>
         <div className="my-6 h-px bg-border" />
-        <p className="text-center text-base font-semibold tracking-[0.08em] text-gold">{ORGANISER_LINE}</p>
+        <p className="text-center font-display text-xs font-semibold tracking-[0.12em] text-gold">{ORGANISER_LINE}</p>
         <p className="text-center text-xs text-text-muted">{ORGANISER_SUBLINE}</p>
       </div>
     </main>

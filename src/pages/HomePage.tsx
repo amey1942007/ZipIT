@@ -35,7 +35,7 @@ export function HomePage() {
     <PageFrame title="Home">
       <section className="grid gap-6 rounded-xl border border-border bg-surface p-6 shadow-panel lg:grid-cols-[1.4fr_1fr] lg:p-10">
         <div>
-          <p className="font-display text-h2 text-text lg:text-h1">
+          <p className="font-display text-h2 font-bold text-text lg:text-h1">
             Zip<span className="text-gold">IT</span>
           </p>
           <p className="mt-3 max-w-xl text-text-muted">{TAGLINE}</p>
@@ -59,27 +59,27 @@ export function HomePage() {
             <CodePlaygroundButton />
           </div>
         </div>
-        <dl className="grid content-start gap-3 rounded-xl border border-[var(--zi-hairline-gold)] bg-bg p-4 font-mono">
+        <dl className="grid content-start gap-3 rounded-xl border border-[var(--zi-hairline-gold)] bg-bg p-4">
           <div className="flex justify-between gap-4">
-            <dt className="text-text-muted">STATUS</dt>
-            <dd className="text-success">NOMINAL</dd>
+            <dt className="font-display text-xs font-semibold tracking-[0.12em] text-text-muted">STATUS</dt>
+            <dd className="font-mono font-bold text-success tabular-nums">NOMINAL</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-text-muted">TEAM</dt>
-            <dd>{team?.team_name ?? '—'}</dd>
+            <dt className="font-display text-xs font-semibold tracking-[0.12em] text-text-muted">TEAM</dt>
+            <dd className="font-semibold">{team?.team_name ?? '—'}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-text-muted">RANK</dt>
-            <dd>
+            <dt className="font-display text-xs font-semibold tracking-[0.12em] text-text-muted">RANK</dt>
+            <dd className="font-mono font-bold tabular-nums">
               {rank}
               {teams ? ` / ${teams}` : ''}
             </dd>
           </div>
         </dl>
       </section>
-      <p className="text-center text-xs tracking-[0.12em] text-text-muted">
-        {ORGANISER_LINE}
-        <span className="mt-1 block normal-case tracking-normal">{ORGANISER_SUBLINE}</span>
+      <p className="text-center text-text-muted">
+        <span className="block font-display text-xs font-semibold tracking-[0.12em]">{ORGANISER_LINE}</span>
+        <span className="mt-1 block text-xs">{ORGANISER_SUBLINE}</span>
       </p>
     </PageFrame>
   )
