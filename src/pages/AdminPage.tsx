@@ -1,83 +1,85 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
-import { PASSWORD_MIN } from '@/config/site'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import { PageFrame } from '@/components/PageFrame'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   downloadSubmission,
   fetchAllSubmissions,
   fetchAudit,
+  fetchLeaderboard,
   fetchSettings,
   fetchTeams,
-  invokeTeamAction,
-  setLeaderboardFrozen,
-  setOfficialScore,
   type AuditRow,
+  type LeaderboardRow,
   type SubmissionRow,
 } from '@/lib/data'
 import type { Tables } from '@/lib/database.types'
 import { formatIst, formatScore } from '@/lib/format'
+import { compareRanking } from '@/lib/ranking'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   ['teams', 'Teams'],
   ['submissions', 'Submissions'],
-  ['scores', 'Scores'],
   ['leaderboard', 'Leaderboard'],
   ['audit', 'Audit'],
 ] as const
 
+type AdminTab = (typeof TABS)[number][0]
+
+function isAdminTab(value: string | undefined): value is AdminTab {
+  return TABS.some(([id]) => id === value)
+}
+
 export function AdminPage() {
   const params = useParams()
-  const tab = TABS.some((item) => item[0] === params.tab) ? params.tab! : 'teams'
+  const tab: AdminTab = isAdminTab(params.tab) ? params.tab : 'teams'
   const [teams, setTeams] = useState<Tables<'teams'>[]>([])
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
+  const [board, setBoard] = useState<LeaderboardRow[]>([])
   const [audit, setAudit] = useState<AuditRow[]>([])
   const [frozen, setFrozen] = useState(false)
+  const [frozenAt, setFrozenAt] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const [message, setMessage] = useState('')
   const [code, setCode] = useState('')
-  const [username, setUsername] = useState('')
-  const [teamName, setTeamName] = useState('')
-  const [password, setPassword] = useState('')
-  const [scoreId, setScoreId] = useState('')
-  const [score, setScore] = useState('')
-  const [reason, setReason] = useState('')
-
-  async function reload() {
-    const [nextTeams, nextSubs, nextAudit, settings] = await Promise.all([
-      fetchTeams().catch(() => []),
-      fetchAllSubmissions().catch(() => []),
-      fetchAudit().catch(() => []),
-      fetchSettings().catch(() => null),
-    ])
-    setTeams(nextTeams)
-    setSubmissions(nextSubs)
-    setAudit(nextAudit)
-    setFrozen(Boolean(settings?.leaderboard_frozen))
-  }
+  const [searchParams] = useSearchParams()
+  const teamFilter = searchParams.get('team')
 
   useEffect(() => {
-    void reload()
+    let cancelled = false
+    void Promise.all([
+      fetchTeams().catch(() => []),
+      fetchAllSubmissions().catch(() => []),
+      fetchLeaderboard().catch(() => []),
+      fetchAudit().catch(() => []),
+      fetchSettings().catch(() => null),
+    ]).then(([nextTeams, nextSubs, nextBoard, nextAudit, settings]) => {
+      if (cancelled) return
+      setTeams(nextTeams)
+      setSubmissions(nextSubs)
+      setBoard(nextBoard.slice().sort(compareRanking))
+      setAudit(nextAudit)
+      setFrozen(Boolean(settings?.leaderboard_frozen))
+      setFrozenAt(settings?.frozen_at ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  async function onCreate(event: FormEvent) {
-    event.preventDefault()
-    if (password.length < PASSWORD_MIN) {
-      setMessage(`Password must be at least ${PASSWORD_MIN} characters.`)
-      return
-    }
-    try {
-      await invokeTeamAction({ action: 'create', username: username.trim().toLowerCase(), team_name: teamName.trim(), password })
-      setUsername('')
-      setTeamName('')
-      setPassword('')
-      setMessage('Team created.')
-      await reload()
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not create the team.')
-    }
+  const visibleTeams = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return teams
+    return teams.filter(
+      (row) => row.team_name.toLowerCase().includes(needle) || row.username.toLowerCase().includes(needle),
+    )
+  }, [query, teams])
+
+  const visibleSubmissions = teamFilter ? submissions.filter((row) => row.team_id === teamFilter) : submissions
+
+  if (!isAdminTab(params.tab)) {
+    return <Navigate to="/admin/teams" replace />
   }
 
   return (
@@ -96,22 +98,20 @@ export function AdminPage() {
           </Link>
         ))}
       </nav>
+      <p>The admin page has no write actions; the site is view-only for the admin.</p>
       {message ? <p className="text-text-muted">{message}</p> : null}
 
       {tab === 'teams' ? (
         <section className="grid gap-4">
-          <form className="grid max-w-lg gap-3 rounded-xl border border-border bg-surface p-4" onSubmit={onCreate}>
-            <h2 className="text-h4">Create team</h2>
-            <Label htmlFor="new-username">Username</Label>
-            <Input id="new-username" value={username} onChange={(event) => setUsername(event.target.value)} required />
-            <Label htmlFor="new-team">Team name</Label>
-            <Input id="new-team" value={teamName} onChange={(event) => setTeamName(event.target.value)} required />
-            <Label htmlFor="new-pass">Password</Label>
-            <Input id="new-pass" type="password" minLength={PASSWORD_MIN} value={password} onChange={(event) => setPassword(event.target.value)} required />
-            <Button type="submit" className="h-11 w-fit rounded-full text-white">
-              Create
-            </Button>
-          </form>
+          <label className="grid max-w-sm gap-1 text-sm text-text-muted" htmlFor="admin-team-search">
+            Search
+            <input
+              id="admin-team-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="h-11 rounded-xl border border-border-strong bg-surface-2 px-3 text-text"
+            />
+          </label>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left">
               <thead className="text-sm text-text-muted">
@@ -119,46 +119,19 @@ export function AdminPage() {
                   <th className="px-3 py-2">Team</th>
                   <th className="px-3 py-2">Username</th>
                   <th className="px-3 py-2">Role</th>
-                  <th className="px-3 py-2">Actions</th>
+                  <th className="px-3 py-2">Replays</th>
                 </tr>
               </thead>
               <tbody>
-                {teams.map((row) => (
+                {visibleTeams.map((row) => (
                   <tr key={row.id} className="border-t border-border">
-                    <td className="px-3 py-2">{row.team_name}</td>
+                    <td className="px-3 py-2 font-semibold">{row.team_name}</td>
                     <td className="px-3 py-2 font-mono text-sm">@{row.username}</td>
                     <td className="px-3 py-2">{row.role}</td>
                     <td className="px-3 py-2">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-11 rounded-full"
-                          onClick={() => {
-                            const next = window.prompt('New password (at least 8 characters)')
-                            if (!next || next.length < PASSWORD_MIN) return
-                            void invokeTeamAction({ action: 'reset_password', team_id: row.id, password: next })
-                              .then(() => setMessage(`Password reset for ${row.team_name}.`))
-                              .catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Reset failed.'))
-                          }}
-                        >
-                          Reset password
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          className="h-11 rounded-full"
-                          onClick={() => {
-                            if (!window.confirm(`Delete ${row.team_name}?`)) return
-                            void invokeTeamAction({ action: 'delete', team_id: row.id })
-                              .then(() => reload())
-                              .then(() => setMessage(`${row.team_name} deleted.`))
-                              .catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Delete failed.'))
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </div>
+                      <Link to={`/admin/submissions?team=${row.id}`} className="font-semibold text-gold">
+                        Open replays
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -177,18 +150,21 @@ export function AdminPage() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Score</th>
                 <th className="px-3 py-2">When</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-3 py-2">Replay</th>
               </tr>
             </thead>
             <tbody>
-              {submissions.map((row) => (
+              {visibleSubmissions.map((row) => (
                 <tr key={row.id} className="border-t border-border">
                   <td className="px-3 py-2">{row.file_name}</td>
                   <td className="px-3 py-2">{row.status}</td>
-                  <td className="px-3 py-2">{formatScore(row.score)}</td>
+                  <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatScore(row.score)}</td>
                   <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatIst(row.created_at, true)}</td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
+                      <Link to={`/arena/${row.id}?team=${row.team_id}`} className="font-semibold text-gold">
+                        Open replay
+                      </Link>
                       <Button
                         type="button"
                         variant="outline"
@@ -196,13 +172,10 @@ export function AdminPage() {
                         onClick={() => {
                           void downloadSubmission(row.file_path)
                             .then(setCode)
-                            .catch(() => setMessage('Could not download that file.'))
+                            .catch(() => setMessage('Could not load that file.'))
                         }}
                       >
-                        Download
-                      </Button>
-                      <Button asChild variant="outline" className="h-11 rounded-full">
-                        <Link to={`/arena/${row.id}?team=${row.team_id}`}>View</Link>
+                        View code
                       </Button>
                     </div>
                   </td>
@@ -216,75 +189,39 @@ export function AdminPage() {
         </section>
       ) : null}
 
-      {tab === 'scores' ? (
-        <form
-          className="grid max-w-lg gap-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const value = Number(score)
-            if (!scoreId || !Number.isFinite(value)) {
-              setMessage('Choose a submission and a score.')
-              return
-            }
-            if (!reason.trim()) {
-              setMessage('A reason is required.')
-              return
-            }
-            void setOfficialScore(scoreId, value, reason.trim())
-              .then(() => {
-                setMessage('Score saved.')
-                setReason('')
-                return reload()
-              })
-              .catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Could not save the score.'))
-          }}
-        >
-          <h2 className="text-h4">Set official score</h2>
-          <Label htmlFor="score-submission">Submission</Label>
-          <select
-            id="score-submission"
-            className="h-11 rounded-xl border border-border-strong bg-surface-2 px-3"
-            value={scoreId}
-            onChange={(event) => setScoreId(event.target.value)}
-          >
-            <option value="">Choose</option>
-            {submissions.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.file_name} · {row.status}
-              </option>
-            ))}
-          </select>
-          <Label htmlFor="official-score">Score</Label>
-          <Input id="official-score" inputMode="decimal" value={score} onChange={(event) => setScore(event.target.value)} />
-          <Label htmlFor="score-reason">Reason</Label>
-          <textarea
-            id="score-reason"
-            className="min-h-24 rounded-xl border border-border-strong bg-surface-2 p-3"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-          <Button type="submit" className="h-11 w-fit rounded-full text-white">
-            Save score
-          </Button>
-        </form>
-      ) : null}
-
       {tab === 'leaderboard' ? (
-        <section className="grid max-w-lg gap-3">
-          <h2 className="text-h4">Freeze</h2>
-          <p className="text-text-muted">{frozen ? 'The leaderboard is frozen.' : 'The leaderboard is live.'}</p>
-          <Button
-            type="button"
-            className="h-11 w-fit rounded-full text-white"
-            onClick={() => {
-              void setLeaderboardFrozen(!frozen)
-                .then(() => reload())
-                .then(() => setMessage(frozen ? 'Leaderboard unfrozen.' : 'Leaderboard frozen.'))
-                .catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Could not update the freeze.'))
-            }}
-          >
-            {frozen ? 'Unfreeze' : 'Freeze leaderboard'}
-          </Button>
+        <section className="grid gap-4">
+          <p>{frozen ? `Frozen since ${formatIst(frozenAt, true)}` : 'Live'}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left">
+            <thead className="text-sm text-text-muted">
+              <tr>
+                <th className="px-3 py-2">Rank</th>
+                <th className="px-3 py-2">Team</th>
+                <th className="px-3 py-2">Score</th>
+                <th className="px-3 py-2">Scored</th>
+              </tr>
+            </thead>
+            <tbody>
+              {board.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-6 text-text-muted" colSpan={4}>
+                    No scores yet.
+                  </td>
+                </tr>
+              ) : (
+                board.map((row, index) => (
+                  <tr key={row.team_id} className="border-t border-border">
+                    <td className="px-3 py-2 font-mono font-bold tabular-nums">{index + 1}</td>
+                    <td className="px-3 py-2 font-semibold">{row.team_name}</td>
+                    <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatScore(row.best_score)}</td>
+                    <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatIst(row.best_scored_at, true)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
 
@@ -305,7 +242,7 @@ export function AdminPage() {
                   <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatIst(row.at, true)}</td>
                   <td className="px-3 py-2">{row.action}</td>
                   <td className="px-3 py-2">{row.actor_kind}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{JSON.stringify(row.details)}</td>
+                  <td className="px-3 py-2 font-mono text-xs font-normal">{JSON.stringify(row.details)}</td>
                 </tr>
               ))}
             </tbody>
