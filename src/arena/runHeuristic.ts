@@ -14,6 +14,8 @@ export interface HeuristicRunRequest {
   puzzle: ReplayPuzzle
   seed?: number
   limits?: Partial<RunLimits>
+  onSteps?: (count: number) => void
+  signal?: AbortSignal
 }
 
 interface WorkerMessage {
@@ -94,6 +96,13 @@ export function runHeuristic(request: HeuristicRunRequest): Promise<RunOutcome> 
       resolve(outcomeFromLog(request.puzzle, steps, status, error))
     }
 
+    const cancel = () => finish('error', 'cancelled')
+    if (request.signal?.aborted) {
+      cancel()
+      return
+    }
+    request.signal?.addEventListener('abort', cancel, { once: true })
+
     timer = window.setTimeout(() => finish('timeout', null), LOAD_TIMEOUT_MS)
 
     worker.onmessage = (event: MessageEvent<unknown>) => {
@@ -115,6 +124,7 @@ export function runHeuristic(request: HeuristicRunRequest): Promise<RunOutcome> 
       }
       if (message.type === 'chunk' && Array.isArray(message.steps)) {
         for (const step of message.steps) if (isStep(step)) steps.push(step)
+        request.onSteps?.(steps.length)
         return
       }
       if (message.type === 'done' || message.type === 'error') {
