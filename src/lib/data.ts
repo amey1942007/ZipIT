@@ -150,33 +150,3 @@ export async function fetchAudit(): Promise<AuditRow[]> {
   if (error) throw error
   return data ?? []
 }
-
-export async function setOfficialScore(submissionId: string, score: number, reason: string): Promise<void> {
-  if (!supabase) throw new Error('backend')
-  const { error } = await supabase.rpc('admin_set_score', {
-    p_submission: submissionId,
-    p_score: score,
-    p_metrics: { reason },
-  })
-  if (error) throw new Error(error.message)
-}
-
-export async function setLeaderboardFrozen(frozen: boolean): Promise<void> {
-  if (!supabase) throw new Error('backend')
-  const { error } = await supabase.rpc('admin_set_freeze', { p_frozen: frozen })
-  if (error) throw new Error(error.message)
-}
-
-export async function invokeTeamAction(body: Record<string, unknown>): Promise<Record<string, unknown>> {
-  if (!supabase) throw new Error('backend')
-  const { data, error } = await supabase.functions.invoke('admin-manage-teams', { body })
-  if (error) {
-    const context = (error as { context?: Response }).context
-    if (context) {
-      const payload = (await context.json()) as { error?: string }
-      throw new Error(payload.error ?? 'request_failed')
-    }
-    throw error
-  }
-  return (data ?? {}) as Record<string, unknown>
-}
