@@ -143,7 +143,8 @@
 .zi-panel {
   position: relative;
   overflow: hidden;
-  container-type: size;
+  /* `size` collapses auto-height panels to 0. Hero/login panels opt back in. */
+  container-type: inline-size;
   border-radius: var(--zi-panel-radius);
   box-shadow: inset 0 0 0 var(--zi-ink-panel) var(--zi-ink);
 }
@@ -456,11 +457,39 @@
 }
 
 .zi-cbox :focus-visible,
+.zi-balloon:focus-within {
+  box-shadow: var(--zi-shadow-balloon), 0 0 0 4px var(--zi-gold-c);
+}
 .zi-balloon :focus-visible {
   outline: 3px solid var(--zi-ink);
   outline-offset: 2px;
   box-shadow: 0 0 0 7px var(--zi-gold-c);
 }
+@keyframes zi-hud-drop {
+  from { transform: translateY(-40px); }
+  to { transform: none; }
+}
+.zi-hud-drop { animation: zi-hud-drop 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes zi-badge-pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+.zi-badge-pop { animation: zi-badge-pop 200ms cubic-bezier(0.34, 2.2, 0.64, 1) both; }
+@keyframes zi-chip-pop {
+  from { transform: scale(0.6); }
+  to { transform: none; }
+}
+.zi-chip-ok { animation: zi-chip-pop 160ms cubic-bezier(0.34, 2.2, 0.64, 1) both; }
+@keyframes zi-enter-l {
+  from { opacity: 0; transform: translateX(-48px) rotate(-2deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes zi-enter-r {
+  from { opacity: 0; transform: translateX(48px) rotate(2deg); }
+  to { opacity: 1; transform: none; }
+}
+.zi-enter-l { animation: zi-enter-l 240ms cubic-bezier(0.34, 1.6, 0.64, 1) both; }
+.zi-enter-r { animation: zi-enter-r 240ms cubic-bezier(0.34, 1.6, 0.64, 1) 60ms both; }
 
 @media (max-width: 639px) {
   .zi-cbox-compact h1 { font-size: 24px; }
@@ -548,6 +577,200 @@
   .zi-slot-every { grid-area: p7; }
   .zi-login-grid { grid-template-columns: 1fr; grid-template-areas: "id" "key" "go"; }
 }
+@media (min-width: 640px) {
+  .zi-hero-grid .zi-panel {
+    container-type: size;
+    height: 100%;
+  }
+  .zi-login-grid {
+    grid-template-rows: minmax(440px, 1fr);
+  }
+  .zi-login-grid .zi-panel {
+    container-type: size;
+    height: 100%;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .zi-login-grid { grid-template-rows: minmax(360px, auto) minmax(200px, auto); }
+}
+
+@keyframes zi-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.zi-hero-grid > [data-panel] {
+  animation: zi-bob 5.2s ease-in-out infinite;
+}
+.zi-intro > [data-panel] { animation: none; }
+.zi-slot-order { animation-duration: 5.6s; animation-delay: -0.7s; }
+.zi-slot-code { animation-duration: 4.6s; animation-delay: -1.5s; }
+.zi-slot-stats { animation-duration: 5.8s; animation-delay: -2.3s; }
+.zi-slot-cta { animation-duration: 4.8s; animation-delay: -3.1s; }
+.zi-slot-every { animation-duration: 5.4s; animation-delay: -3.9s; }
+.zi-slot-headline { animation-duration: 4.4s; animation-delay: -1.1s; }
+
+.zi-zip-glow {
+  opacity: 0.9;
+  filter: drop-shadow(0 0 5px #ffc83d) drop-shadow(0 0 12px rgba(125, 249, 255, 0.7));
+}
+.zi-zip-core {
+  filter: drop-shadow(0 0 3px #fff6e8) drop-shadow(0 0 8px rgba(255, 200, 61, 0.85));
+}
+.zi-zip-bolt {
+  opacity: 1;
+}
+.zi-zip-live {
+  animation: zi-crackle 1.7s linear infinite;
+}
+@keyframes zi-crackle {
+  0%, 100% { opacity: 1; stroke-dasharray: 0.055 0.018 0.028 0.014; }
+  18% { opacity: 0.35; stroke-dasharray: 0.02 0.03 0.05 0.012; }
+  22% { opacity: 1; }
+  61% { opacity: 0.72; stroke-dasharray: 0.04 0.01 0.016 0.028; }
+  78% { opacity: 0.2; }
+  82% { opacity: 1; filter: drop-shadow(0 0 8px #fff6e8) drop-shadow(0 0 14px #ffc83d); }
+}
+
+.zi-codebox { position: relative; overflow: hidden; }
+.zi-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 34px;
+  background: linear-gradient(180deg, transparent, rgba(255, 200, 61, 0.22) 70%, rgba(255, 200, 61, 0.5));
+  border-bottom: 2px solid var(--zi-gold-c);
+  box-shadow: 0 6px 16px rgba(255, 200, 61, 0.4);
+  animation: zi-scan 500ms var(--zi-ease-scan, cubic-bezier(0.65, 0, 0.35, 1)) infinite;
+  pointer-events: none;
+}
+@keyframes zi-scan {
+  from { transform: translateY(0); }
+  to { transform: translateY(240px); }
+}
+
+.zi-login-grid { position: relative; min-height: clamp(440px, calc(100svh - 108px), 572px); }
+.zi-login-path path { transition: stroke-dashoffset 280ms var(--zi-ease-forged, cubic-bezier(0.2, 0.8, 0.2, 1)); }
+
+@keyframes zi-slam-a {
+  from { transform: scale(1.22) rotate(-4deg); }
+  to { transform: none; }
+}
+@keyframes zi-slam-b {
+  from { transform: scale(1.22) rotate(4deg); }
+  to { transform: none; }
+}
+.zi-intro .zi-slot-path .zi-panel { animation: zi-slam-a 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 50ms both; }
+.zi-intro .zi-slot-order .zi-panel { animation: zi-slam-b 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 110ms both; }
+.zi-intro .zi-slot-code .zi-panel { animation: zi-slam-a 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 170ms both; }
+.zi-intro .zi-slot-stats .zi-panel { animation: zi-slam-b 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 230ms both; }
+.zi-intro .zi-slot-cta .zi-panel { animation: zi-slam-a 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 290ms both; }
+.zi-intro .zi-slot-every .zi-panel { animation: zi-slam-b 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 350ms both; }
+.zi-intro .zi-slot-headline .zi-panel { animation: zi-slam-a 260ms cubic-bezier(0.34, 1.8, 0.64, 1) 410ms both; }
+
+.zi-panel > .fill,
+.zi-panel > .content,
+.zi-panel > .edge {
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.zi-panel > .zi-lock { inset: 8px; }
+.zi-panel > .zi-lock,
+.zi-abtn > .zi-lock {
+  z-index: 4;
+  opacity: 0;
+  transform: scale(1.5);
+  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1), transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (hover: hover) {
+  .zi-panel:hover {
+    transform: translate(-5px, -5px);
+    box-shadow: 8px 8px 0 var(--zi-red-c), inset 0 0 0 3px var(--zi-ink);
+  }
+  .zi-panel:hover > .zi-lock,
+  .zi-panel:focus-within > .zi-lock,
+  .zi-abtn:hover > .zi-lock,
+  .zi-abtn:focus-visible > .zi-lock {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes zi-squash {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.12, 0.8); }
+  65% { transform: scale(0.96, 1.06); }
+  100% { transform: scale(1, 1); }
+}
+.zi-squash { animation: zi-squash 420ms linear; transform-origin: 50% 100%; }
+.zi-click-pop {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  z-index: 6;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+@keyframes zi-impact {
+  from { transform: scale(0.6); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+.zi-impact { display: block; animation: zi-impact 350ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes zi-sfx-in {
+  0% { opacity: 1; transform: scale(2.4) translateX(0); }
+  55% { opacity: 1; transform: scale(1.08) translateX(3px); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
+@keyframes zi-sfx-out {
+  to { opacity: 0; transform: scale(0.7); }
+}
+.zi-sfx-play {
+  transform-origin: center;
+  animation:
+    zi-sfx-in 180ms cubic-bezier(0.34, 2.2, 0.64, 1) both,
+    zi-sfx-out 200ms cubic-bezier(0.4, 0, 1, 1) var(--zi-sfx-hold, 570ms) forwards;
+}
+.zi-sfx-stamp { transform: scale(0.5); transform-origin: center; }
+
+@keyframes zi-stamp {
+  from { transform: scale(2) rotate(-4deg); }
+  to { transform: scale(1) rotate(-4deg); }
+}
+.zi-stamp { animation: zi-stamp 150ms cubic-bezier(0.34, 2.2, 0.64, 1) both; }
+
+@keyframes zi-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(6px, -4px); }
+  40% { transform: translate(-5px, 3px); }
+  60% { transform: translate(4px, 2px); }
+  80% { transform: translate(-2px, -2px); }
+}
+.zi-shake { animation: zi-shake 350ms linear; }
+
 @media (prefers-reduced-motion: reduce) {
   .zi-page { animation: none; }
+  .zi-hero-grid > [data-panel] { animation: none; }
+  .zi-zip-live { animation: none; opacity: 1; filter: drop-shadow(0 0 6px #fff6e8) drop-shadow(0 0 10px #ffc83d); }
+  .zi-scan { display: none; }
+  .zi-login-path path { transition: none; }
+  .zi-login-grid { min-height: 0; }
+  .zi-intro .zi-panel,
+  .zi-squash,
+  .zi-sfx-play,
+  .zi-stamp,
+  .zi-shake,
+  .zi-impact,
+  .zi-hud-drop,
+  .zi-badge-pop,
+  .zi-chip-ok,
+  .zi-enter-l,
+  .zi-enter-r { animation: none; }
+  .zi-sfx-play, .zi-sfx-stamp { transform: scale(0.5); }
+  .zi-panel:hover { transform: none; }
+  .zi-panel > .zi-lock,
+  .zi-abtn > .zi-lock { transition: none; transform: none; }
+}
+@media (max-width: 639px) {
+  .zi-login-grid { min-height: 0; grid-template-rows: auto; }
+  .zi-login-grid .zi-panel { min-height: 220px; }
 }

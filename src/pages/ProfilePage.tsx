@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { PASSWORD_MIN } from '@/config/site'
 import { ActionButton } from '@/components/comic/ActionButton'
 import { HudReadout } from '@/components/comic/HudReadout'
@@ -12,8 +13,11 @@ import {
   AVATAR_SAVED,
   encodeAvatar,
 } from '@/lib/avatarEncode'
-import { avatarUrl, removeAvatar, saveAvatar, updateTeamName } from '@/lib/data'
+import { avatarUrl, fetchSubmissions, removeAvatar, saveAvatar, updateTeamName, type SubmissionRow } from '@/lib/data'
+import { formatScore, initials } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
+import { rankOf, useTeamStats } from '@/lib/useTeamStats'
+import { useSubmissionFeed } from '@/lib/useLive'
 
 export function ProfilePage() {
   const { team, refreshTeam } = useAuth()
@@ -26,6 +30,16 @@ export function ProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState('')
   const [avatarMessage, setAvatarMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [rows, setRows] = useState<SubmissionRow[]>([])
+  const stats = useTeamStats()
+  const reloadRows = useCallback(() => {
+    if (!team) return
+    void fetchSubmissions(team.id).then(setRows).catch(() => setRows([]))
+  }, [team])
+  useEffect(() => {
+    reloadRows()
+  }, [reloadRows])
+  useSubmissionFeed(team?.id ?? null, reloadRows)
 
   async function onName(event: FormEvent) {
     event.preventDefault()
@@ -78,9 +92,42 @@ export function ProfilePage() {
   }
 
   const preview = avatarUrl(team?.avatar_path, team?.updated_at)
+  const mine = team ? stats.rows.find((row) => row.team_id === team.id) : undefined
+  const rank = rankOf(stats.rows, team?.id ?? null)
+  const submissionValue = !stats.loaded ? '—' : stats.submissions == null ? '—' : String(stats.submissions)
 
   return (
     <PageFrame title="Profile">
+      <Panel fill="maroon">
+        <div className="flex flex-wrap items-center gap-5 p-5 text-ivory">
+          {preview ? (
+            <img src={preview} alt="" width={96} height={96} className="size-24 rounded-full border-[3px] border-ink object-cover" />
+          ) : (
+            <span className="grid size-24 place-items-center rounded-full border-[3px] border-ink bg-ink font-display text-3xl font-bold text-ivory">
+              {initials(team?.team_name ?? 'Team')}
+            </span>
+          )}
+          <div>
+            <HudReadout>TEAM</HudReadout>
+            <p className="font-display text-4xl font-bold">{team?.team_name ?? '—'}</p>
+          </div>
+          <dl className="grid flex-1 grid-cols-3 gap-2 sm:min-w-80">
+            <div className="bg-ink px-3 py-2">
+              <dt className="font-mono text-[11px] font-bold tracking-[0.14em] text-ivory-muted">BEST</dt>
+              <dd className="font-display text-3xl font-bold text-ivory tabular-nums">{stats.loaded ? formatScore(mine?.best_score) : '—'}</dd>
+            </div>
+            <div className="bg-ink px-3 py-2">
+              <dt className="font-mono text-[11px] font-bold tracking-[0.14em] text-ivory-muted">RANK</dt>
+              <dd className="font-display text-3xl font-bold text-ivory tabular-nums">{stats.loaded && rank != null ? rank : '—'}</dd>
+            </div>
+            <div className="bg-ink px-3 py-2">
+              <dt className="font-mono text-[11px] font-bold tracking-[0.14em] text-ivory-muted">SUBMISSIONS</dt>
+              <dd className="font-display text-3xl font-bold text-ivory tabular-nums">{submissionValue}</dd>
+            </div>
+          </dl>
+        </div>
+      </Panel>
+      <div className="grid gap-4 lg:grid-cols-3">
       <Panel fill="maroon">
       <section className="grid max-w-lg gap-3 p-4 text-ivory">
         <HudReadout>TEAM NAME</HudReadout>
@@ -148,6 +195,29 @@ export function ProfilePage() {
         </ActionButton>
         {avatarMessage ? <p>{/updated|removed/i.test(avatarMessage) ? <HudReadout>SAVED</HudReadout> : null} {avatarMessage}</p> : null}
       </section>
+      </Panel>
+      </div>
+      <Panel fill="ivory">
+        <div className="grid gap-3 p-5 text-ink">
+          <HudReadout>RECENT SUBMISSIONS</HudReadout>
+          {rows.length === 0 ? (
+            <p>No submissions yet.</p>
+          ) : (
+            <ul className="grid gap-2">
+              {rows.slice(0, 8).map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-[3px] border-ink bg-ivory px-3 py-2">
+                  <span className="truncate font-mono text-sm font-bold">{row.file_name}</span>
+                  <span className="font-mono text-xs font-bold tracking-[0.08em] uppercase">{row.status}</span>
+                  {row.status === 'scored' ? (
+                    <Link to={`/arena/${row.id}`} className="font-display text-sm font-bold text-comic-red">
+                      Replay
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Panel>
     </PageFrame>
   )

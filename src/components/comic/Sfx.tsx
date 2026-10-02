@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { burstPoints, pointsAttr, speedLines } from '@/components/comic/sfxGeometry'
 
 const PRESETS = {
@@ -15,10 +16,15 @@ export type SfxPreset = keyof typeof PRESETS
 export function Sfx({
   preset,
   stamp = true,
+  play = false,
+  holdMs = 570,
   label,
 }: {
   preset: SfxPreset
   stamp?: boolean
+  /** Slam in, hold, then pop out. Timings match concept `sfxAt` (180ms in, 200ms out). */
+  play?: boolean
+  holdMs?: number
   label?: string
 }) {
   const spec = PRESETS[preset]
@@ -26,10 +32,14 @@ export function Sfx({
   const burst = burstPoints(spec.seed, R)
   const star = burstPoints(spec.seed, R, [0.74, 0], [0.5, 0])
   const lines = stamp ? [] : speedLines(spec.seed, R)
+  const motion = play && !stamp
   const pad = R * 3.4
   const size = pad * 2
   return (
-    <span className="inline-block" style={stamp ? { transform: 'scale(0.5)' } : undefined}>
+    <span
+      className={stamp ? 'zi-sfx-stamp inline-block' : motion ? 'zi-sfx-play inline-block' : 'inline-block'}
+      style={motion ? ({ '--zi-sfx-hold': `${holdMs}ms` } as CSSProperties) : undefined}
+    >
       <svg
         aria-hidden="true"
         width={size}

@@ -1,4 +1,5 @@
 import type { ElementType, ReactNode } from 'react'
+import { LockOn } from '@/components/comic/LockOn'
 import { cn } from '@/lib/utils'
 
 const FILLS = {
@@ -46,6 +47,7 @@ export function Panel({
       ) : null}
       <div className={cn('content', inked ? 'opacity-100' : 'opacity-[.22]')}>{children}</div>
       <div className={cn('edge', inked ? 'opacity-100' : 'opacity-0')} />
+      <LockOn />
     </Tag>
   )
 }

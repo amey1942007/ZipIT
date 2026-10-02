@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { PageFrame } from '@/components/PageFrame'
 import { ActionButton } from '@/components/comic/ActionButton'
 import { Balloon } from '@/components/comic/Balloon'
@@ -6,6 +6,7 @@ import { CaptionBox } from '@/components/comic/CaptionBox'
 import { CheckChip } from '@/components/comic/CheckChip'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { Panel } from '@/components/comic/Panel'
+import { Sfx } from '@/components/comic/Sfx'
 import { useAuth } from '@/lib/auth'
 import { fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
 import { formatIst, formatScore } from '@/lib/format'
@@ -22,6 +23,7 @@ export function SubmissionsPage() {
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [preview, setPreview] = useState<string[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(() => {
     if (!team) return
@@ -79,7 +81,7 @@ export function SubmissionsPage() {
   return (
     <PageFrame title="Submissions">
       <div className="grid gap-4 lg:grid-cols-[360fr_840fr]">
-        <Panel fill="ivory">
+        <Panel fill="ivory" className="zi-enter-l">
           <div className="grid gap-4 p-5 text-ink">
             <HudReadout>YOUR FILES · PANEL 1/2</HudReadout>
             <ul className="grid gap-1 bg-ivory text-[15px] font-medium">
@@ -87,8 +89,9 @@ export function SubmissionsPage() {
               <li>Up to 256 KB</li>
               <li>The scorer calls next_move(grid, path, cost_map) and expects (r, c) back.</li>
             </ul>
-            <label className="zi-abtn zi-abtn-primary zi-abtn-hero w-fit">
+            <label className="zi-abtn zi-abtn-primary zi-abtn-hero relative w-fit">
               <input
+                ref={fileRef}
                 className="sr-only"
                 type="file"
                 accept=".py,text/x-python"
@@ -105,7 +108,7 @@ export function SubmissionsPage() {
             </Balloon>
           </div>
         </Panel>
-        <Panel fill="maroon">
+        <Panel fill="maroon" className={outcome === 'ok' ? 'zi-enter-r zi-shake' : 'zi-enter-r'}>
           <div
             className={`grid h-full gap-4 p-5 ${over ? 'shadow-[0_0_30px_rgba(255,200,61,.45)]' : ''}`}
             onDragOver={(event) => {
@@ -116,7 +119,11 @@ export function SubmissionsPage() {
             onDrop={onDrop}
           >
             <HudReadout>SUBMIT HEURISTIC · PANEL 2/2</HudReadout>
-            <div className="rounded border-[3px] border-dashed border-[rgba(255,200,61,.6)] bg-ink p-5">
+            <div
+              className="zi-codebox cursor-pointer rounded border-[3px] border-dashed border-[rgba(255,200,61,.6)] bg-ink p-5"
+              onClick={() => fileRef.current?.click()}
+            >
+              {busy ? <div className="zi-scan" aria-hidden /> : null}
               {preview.length === 0 ? (
                 <p className="font-display text-3xl font-bold text-gold -skew-x-8">DROP YOUR .py HERE</p>
               ) : (
@@ -132,23 +139,26 @@ export function SubmissionsPage() {
               <p className="mt-2 font-mono text-[13px] text-ivory-muted">or use Choose file · one .py · up to 256 KB</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['One file', 'Lowercase .py', 'Not empty', '≤ 256 KB', 'Uploaded', 'Queued'].map((label, index) => {
-                const client = checks?.[index]
-                const state = index < 4 ? (checks == null ? 'idle' : client ? 'ok' : 'bad') : outcome === 'ok' ? 'ok' : outcome === 'error' && index === 4 ? 'bad' : 'idle'
-                return <CheckChip key={label} label={label} state={state === 'bad' ? 'bad' : state === 'ok' ? 'ok' : 'idle'} />
-              })}
+              {['One file', 'Lowercase .py', 'Not empty', '≤ 256 KB', 'Uploaded', 'Queued'].map((label, index) => (
+                <CheckChip key={label} label={label} state={chipState(index, checks, outcome)} delay={index * 120} />
+              ))}
             </div>
             {outcome === 'ok' ? (
-              <CaptionBox>
-                <p className="font-display text-2xl font-bold">
-                  ZIPPED · <span className="text-comic-red">queued for Arena</span>
-                </p>
-                <p>{message}</p>
-              </CaptionBox>
+              <>
+                <span className="pointer-events-none absolute top-16 left-1/2 z-10 -translate-x-1/2">
+                  <Sfx preset="zipped" stamp={false} play holdMs={1600} label="ZIPPED!" />
+                </span>
+                <CaptionBox className="zi-stamp">
+                  <p className="font-display text-2xl font-bold">
+                    ZIPPED! · <span className="text-comic-red">queued for Arena</span>
+                  </p>
+                  <p>{message}</p>
+                </CaptionBox>
+              </>
             ) : null}
             {outcome === 'error' ? (
               <div role="alert">
-                <CaptionBox tone="red">
+                <CaptionBox tone="red" className="zi-stamp">
                   <p className="font-display text-[32px] font-bold text-ivory" aria-hidden>
                     REJECTED
                   </p>
@@ -186,6 +196,43 @@ export function SubmissionsPage() {
           </Panel>
         ))}
       </section>
+      <Panel fill="plain">
+        <div className="grid gap-2 p-4 text-ivory">
+          <HudReadout>TEAM SUBMISSIONS</HudReadout>
+          {rows.length === 0 ? (
+            <p>No submissions yet.</p>
+          ) : (
+            <ul className="grid gap-2">
+              {rows.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(255,246,232,.12)] py-2">
+                  <span className="truncate font-mono text-sm font-bold">{row.file_name}</span>
+                  <span className="font-mono text-xs font-bold tracking-[0.08em] uppercase">{row.status}</span>
+                  {row.status === 'scored' ? (
+                    <ActionButton to={`/arena/${row.id}`} variant="ghost">
+                      Replay
+                    </ActionButton>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Panel>
     </PageFrame>
   )
+}
+
+function chipState(index: number, checks: boolean[] | null, outcome: 'ok' | 'error' | null): 'idle' | 'ok' | 'bad' {
+  if (!checks) return 'idle'
+  const firstBad = checks.findIndex((ok) => !ok)
+  if (index < 4) {
+    if (firstBad === -1) return 'ok'
+    if (index < firstBad) return 'ok'
+    if (index === firstBad) return 'bad'
+    return 'idle'
+  }
+  if (firstBad !== -1) return 'idle'
+  if (outcome === 'ok') return 'ok'
+  if (outcome === 'error' && index === 4) return 'bad'
+  return 'idle'
 }

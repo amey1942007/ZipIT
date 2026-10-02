@@ -59,15 +59,16 @@ export function LeaderboardPage() {
             const mine = row.team_id === team?.id
             const photo = avatarUrl(row.avatar_path, row.best_scored_at)
             const top = index < 3
+            const inkNums = mine || index === 0 || index === 1
             return (
               <div
                 key={row.team_id}
                 role="row"
                 className={`grid h-16 grid-cols-[72px_1fr_140px_160px] items-center border-[3px] border-ink px-3 ${
                   mine ? 'ht-ivory text-ink' : top && index === 0 ? 'ht-gold text-ink' : top && index === 1 ? 'ht-ivory-red text-ink' : top && index === 2 ? 'ht-red text-ivory' : 'ht-maroon text-ivory'
-                }`}
+                } ${top ? 'shadow-[inset_4px_0_0_#FFC83D]' : ''}`}
               >
-                <span role="cell" className="font-mono text-base font-bold text-gold tabular-nums">
+                <span role="cell" className={`font-mono text-base font-bold tabular-nums ${inkNums ? 'text-ink' : 'text-ivory'}`}>
                   {index + 1}
                 </span>
                 <span role="cell" className="inline-flex items-center gap-2 font-semibold">
@@ -79,7 +80,7 @@ export function LeaderboardPage() {
                   {row.team_name}
                   {mine ? <span className="bg-comic-red px-1 font-mono text-[11px] font-bold text-ivory">YOU</span> : null}
                 </span>
-                <span role="cell" className="text-right font-mono text-[21px] font-bold tabular-nums">
+                <span role="cell" className={`text-right font-mono text-[21px] font-bold tabular-nums ${inkNums ? 'text-ink' : 'text-ivory'}`}>
                   {formatScore(row.best_score)}
                 </span>
                 <span role="cell" className="text-right font-mono font-bold tabular-nums">

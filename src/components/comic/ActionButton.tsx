@@ -1,5 +1,8 @@
-import type { MouseEvent, ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { ImpactLines } from '@/components/comic/ImpactLines'
+import { LockOn } from '@/components/comic/LockOn'
+import { Sfx } from '@/components/comic/Sfx'
 import { cn } from '@/lib/utils'
 
 type Variant = 'primary' | 'danger' | 'ghost'
@@ -11,10 +14,24 @@ const VARIANT = {
   ghost: 'zi-abtn-ghost',
 } as const
 
+function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function armClick(event: MouseEvent<HTMLElement>, setTick: (value: number | ((n: number) => number)) => void) {
+  if (reducedMotion()) return
+  const el = event.currentTarget
+  el.classList.remove('zi-squash')
+  void el.offsetWidth
+  el.classList.add('zi-squash')
+  setTick((n) => n + 1)
+}
+
 export function ActionButton({
   variant = 'primary',
   size = 'default',
   to,
+  sfx = 'click',
   className,
   children,
   type = 'button',
@@ -23,21 +40,51 @@ export function ActionButton({
   variant?: Variant
   size?: Size
   to?: string
+  sfx?: 'click' | 'go'
   className?: string
   children?: ReactNode
   type?: 'button' | 'submit'
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'children' | 'className'>) {
-  const classes = cn('zi-abtn', VARIANT[variant], size === 'hero' && 'zi-abtn-hero', className)
+  const [tick, setTick] = useState(0)
+  const classes = cn('zi-abtn relative', VARIANT[variant], size === 'hero' && 'zi-abtn-hero', className)
+  const burst =
+    tick > 0 ? (
+      <span key={tick} className="zi-click-pop">
+        <span className="zi-impact">
+          <ImpactLines compact />
+        </span>
+        <Sfx preset={sfx} stamp={false} play holdMs={sfx === 'go' ? 340 : 570} />
+      </span>
+    ) : null
   if (to) {
     return (
-      <Link to={to} className={classes} onClick={(event) => rest.onClick?.(event as unknown as MouseEvent<HTMLButtonElement>)}>
+      <Link
+        to={to}
+        className={classes}
+        onClick={(event) => {
+          rest.onClick?.(event as unknown as MouseEvent<HTMLButtonElement>)
+          armClick(event, setTick)
+        }}
+      >
         {children}
+        <LockOn />
+        {burst}
       </Link>
     )
   }
   return (
-    <button type={type} className={classes} {...rest}>
+    <button
+      type={type}
+      className={classes}
+      {...rest}
+      onClick={(event) => {
+        rest.onClick?.(event)
+        armClick(event, setTick)
+      }}
+    >
       {children}
+      <LockOn />
+      {burst}
     </button>
   )
 }

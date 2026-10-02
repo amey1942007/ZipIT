@@ -105,11 +105,13 @@ export function ComicHero() {
 
   const progress = playing ? pathProgress(t) : 1
   const arenaTo = session ? '/arena' : '/login?next=%2Farena'
+  const uploadTo = session ? '/submissions' : '/login?next=%2Fsubmissions'
   const filled = fractions.filter((fraction) => progress + 1e-6 >= fraction).length
+  const lit = (index: number) => !playing || (fractions[index] != null && progress + 1e-6 >= fractions[index]!)
 
   return (
-    <section className="zi-hero" onKeyDown={(event) => { if (event.key === 'Escape' && playing) setT(INTRO_END) }}>
-      <div className="zi-hero-strip">
+    <section className={playing && t >= 2.02 && t < 2.4 ? 'zi-hero zi-shake' : 'zi-hero'} onKeyDown={(event) => { if (event.key === 'Escape' && playing) setT(INTRO_END) }}>
+      <div className={playing ? 'zi-hero-strip zi-hud-drop' : 'zi-hero-strip'}>
         <span className="zi-tm max-lg:hidden">{ORGANISER_LINE}</span>
         <PathMeter
           filled={Math.min(7, filled)}
@@ -121,10 +123,15 @@ export function ComicHero() {
           </button>
         ) : null}
       </div>
-      <div ref={gridRef} className="zi-hero-grid">
-        <GutterPath d={d} progress={progress} />
+      <div ref={gridRef} className={playing ? 'zi-hero-grid zi-intro' : 'zi-hero-grid'}>
+        <GutterPath d={d} progress={progress} bolt />
+        {playing && t >= 2.02 ? (
+          <span className="pointer-events-none absolute top-1/2 left-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
+            <Sfx preset="zipit" stamp={false} play holdMs={830} label="ZIP IT!" />
+          </span>
+        ) : null}
         <div data-panel className="zi-slot-path">
-          <Panel fill="red" ghost="1" inked className="h-full">
+          <Panel fill="red" ghost="1" inked={lit(0)} className="h-full">
             <div className="grid h-full content-center p-4">
               <HudReadout>{EVENT_DATE}</HudReadout>
               <p className="comic-word text-[clamp(40px,34cqh,104px)] text-ivory">
@@ -136,7 +143,7 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-order">
-          <Panel fill="gold" ghost="2" inked className="h-full">
+          <Panel fill="gold" ghost="2" inked={lit(1)} className="h-full">
             <div className="grid h-full content-center p-4">
               <p className="comic-word text-[clamp(48px,46cqh,120px)] text-ink">1→N</p>
               <HudReadout>VISIT IN ORDER</HudReadout>
@@ -144,7 +151,7 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-code">
-          <Panel fill="ivory-red" ghost="3" inked className="h-full">
+          <Panel fill="ivory-red" ghost="3" inked={lit(2)} className="h-full">
             <div className="grid h-full content-center gap-3 p-4">
               <HudReadout>YOUR HEURISTIC</HudReadout>
               <Balloon>
@@ -154,12 +161,12 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-stats">
-          <Panel fill="maroon" ghost="4" inked className="h-full">
+          <Panel fill="maroon" ghost="4" inked={lit(3)} className="h-full">
             <TeamStatsPanel introDone={!playing} />
           </Panel>
         </div>
         <div data-panel className="zi-slot-cta">
-          <Panel fill="gold" ghost="5" inked className="h-full">
+          <Panel fill="gold" ghost="5" inked={lit(4)} className="h-full">
             <div className="grid h-full content-center gap-3 p-4">
               <HudReadout>TARGET 05</HudReadout>
               <ActionButton to={arenaTo} size="hero" onClick={() => setT(INTRO_END)}>
@@ -169,7 +176,7 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-every">
-          <Panel fill="ivory" ghost="6" inked className="h-full">
+          <Panel fill="ivory" ghost="6" inked={lit(5)} className="h-full">
             <p className="comic-word p-4 text-[clamp(36px,32cqh,80px)] text-ink">
               EVERY
               <br />
@@ -178,7 +185,7 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-headline">
-          <Panel fill="red" ghost="7" inked className="h-full">
+          <Panel fill="red" ghost="7" inked={lit(6)} className="h-full">
             <div className="relative grid h-full content-center gap-3 p-4 text-ivory">
               <CaptionBox>
                 <h1 tabIndex={-1}>
@@ -190,11 +197,11 @@ export function ComicHero() {
               <p>Write one Python function. We race it across every cell of the grid.</p>
               <p>{TAGLINE}</p>
               <div className="flex flex-wrap gap-2">
-                {session ? <ActionButton to="/submissions">Upload a heuristic</ActionButton> : <ActionButton to="/login">Sign in</ActionButton>}
+                <ActionButton to={uploadTo}>Upload a heuristic</ActionButton>
                 <ActionButton to="/leaderboard" variant="ghost">
                   Leaderboard
                 </ActionButton>
-                {session ? <CodePlaygroundButton /> : null}
+                <CodePlaygroundButton />
               </div>
               <p className="font-display text-xs font-semibold text-gold">
                 {ORGANISER_LINE}
@@ -210,7 +217,7 @@ export function ComicHero() {
         </div>
         {badges.map((point, index) => (
           <span key={index} className="pointer-events-none absolute z-10" style={{ left: point.x, top: point.y, transform: 'translate(-50%, -50%)' }}>
-            <Badge n={index + 1} reached={!playing || progress >= (fractions[index] ?? 1)} />
+            <Badge n={index + 1} reached={!playing || progress >= (fractions[index] ?? 1)} className={playing ? 'zi-badge-pop' : undefined} />
             {!playing ? <span className="sr-only">{`NODE 0${index + 1} · ${nodeElapsed(reachTime(fractions[index] ?? 0))}s`}</span> : null}
           </span>
         ))}
