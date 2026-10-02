@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react'
 import { useReducedMotion } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -8,11 +8,59 @@ import { ActionButton } from '@/components/comic/ActionButton'
 import { Balloon } from '@/components/comic/Balloon'
 import { CaptionBox } from '@/components/comic/CaptionBox'
 import { HudReadout } from '@/components/comic/HudReadout'
+import { GutterPath } from '@/components/comic/GutterPath'
+import { Sfx } from '@/components/comic/Sfx'
 import { Panel } from '@/components/comic/Panel'
 import { PathMeter } from '@/components/comic/PathMeter'
 import { usePageTitle, Wordmark } from '@/components/shell/Shell'
 import { loginEmail } from '@/lib/format'
+import { distanceAlong, pathLength, pointsToD, type Point, type Rect } from '@/lib/gutterRoute'
 import { supabase } from '@/lib/supabase'
+
+function boxOf(root: HTMLElement, el: HTMLElement): Rect {
+  const base = root.getBoundingClientRect()
+  const box = el.getBoundingClientRect()
+  return { x: box.left - base.left, y: box.top - base.top, w: box.width, h: box.height }
+}
+
+function loginRoute(width: number, id: Rect, key: Rect, go: Rect): { points: Point[]; stops: number[] } {
+  let points: Point[]
+  let marks: [Point, Point, Point, Point]
+  if (width < 640) {
+    const x = id.x - 12
+    const b1 = { x, y: id.y + 28 }
+    const b2 = { x, y: key.y + 28 }
+    const b3 = { x, y: go.y + 28 }
+    const end = { x, y: go.y + go.h }
+    points = [{ x, y: id.y }, b1, b2, b3, end]
+    marks = [points[0]!, b1, b2, b3]
+  } else if (width < 1024) {
+    const L = id.x - 16
+    const T = id.y - 8
+    const R = key.x + key.w + 16
+    const gy = key.y + key.h + 8
+    const b1 = { x: id.x + id.w / 2, y: T }
+    const b2 = { x: key.x + key.w / 2, y: T }
+    const b3 = { x: go.x + go.w / 2, y: gy }
+    const end = { x: L, y: gy }
+    points = [{ x: L, y: id.y + id.h }, { x: L, y: T }, b1, b2, { x: R, y: T }, { x: R, y: gy }, b3, end]
+    marks = [points[0]!, b1, b2, b3]
+  } else {
+    const L = id.x - 16
+    const T = id.y - 8
+    const R = go.x + go.w + 16
+    const B = id.y + id.h + 8
+    const b1 = { x: id.x + id.w / 2, y: T }
+    const b2 = { x: key.x + key.w / 2, y: T }
+    const b3 = { x: go.x + go.w / 2, y: T }
+    const end = { x: R, y: B }
+    points = [{ x: L, y: B }, { x: L, y: T }, b1, b2, b3, { x: R, y: T }, end]
+    marks = [points[0]!, b1, b2, b3]
+  }
+  const length = pathLength(points) || 1
+  const lengthStops = marks.map((point) => distanceAlong(points, point) / length)
+  return { points, stops: [...lengthStops, 1] }
+}
 
 export function LoginPage() {
   usePageTitle('Login')
@@ -28,6 +76,26 @@ export function LoginPage() {
   const [formError, setFormError] = useState('')
   const [granted, setGranted] = useState(false)
   const timer = useRef(0)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [route, setRoute] = useState<{ d: string; stops: number[] }>({ d: '', stops: [0, 0, 0, 0, 1] })
+
+  useEffect(() => {
+    const root = formRef.current
+    if (!root) return
+    const measure = () => {
+      const id = root.querySelector<HTMLElement>('.zi-login-id')
+      const key = root.querySelector<HTMLElement>('.zi-login-key')
+      const go = root.querySelector<HTMLElement>('.zi-login-go')
+      if (!id || !key || !go) return
+      const built = loginRoute(root.clientWidth, boxOf(root, id), boxOf(root, key), boxOf(root, go))
+      setRoute({ d: pointsToD(built.points), stops: built.stops })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -75,9 +143,11 @@ export function LoginPage() {
   const idSet = username.trim() !== ''
   const keySet = idSet && password !== ''
   const step = busy || granted ? 3 : keySet ? 2 : idSet ? 1 : 0
+  const stop = granted ? 4 : formError ? 2 : busy ? 3 : keySet ? 2 : idSet ? 1 : 0
+  const pathProgress = route.stops[stop] ?? 0
 
   return (
-    <main id="main" tabIndex={-1} className="min-h-svh bg-ink text-ivory outline-none">
+    <main id="main" tabIndex={-1} className={granted ? 'zi-shake min-h-svh bg-ink text-ivory outline-none' : 'min-h-svh bg-ink text-ivory outline-none'}>
       <h1 className="sr-only">Login</h1>
       <p className="sr-only">{EVENT_DATE}</p>
       <header className="zi-hud flex h-[50px] items-center justify-between border-b-2 border-[rgba(255,200,61,.55)] px-4">
@@ -87,7 +157,8 @@ export function LoginPage() {
         </span>
         <PathMeter total={3} filled={step} label="LOGIN" readout={`PANEL ${Math.max(step, 1)}/3`} />
       </header>
-      <form noValidate className="zi-login-grid" onSubmit={onSubmit}>
+      <form ref={formRef} noValidate className="zi-login-grid" onSubmit={onSubmit}>
+        <GutterPath d={route.d} progress={pathProgress} />
         <Panel fill="ivory" className="zi-login-id">
           <div className="grid h-full content-start gap-4 p-6 text-ink">
             <HudReadout>IDENTIFY · PANEL 1/3</HudReadout>
@@ -171,15 +242,18 @@ export function LoginPage() {
           <div className="grid h-full content-start gap-4 p-6">
             <HudReadout>ENGAGE · PANEL 3/3</HudReadout>
             <p className="comic-word text-6xl text-ivory">GO.</p>
+            <span className="pointer-events-none absolute top-24 right-6" aria-hidden>
+              <Sfx preset="go" stamp />
+            </span>
             <BackendNotice />
-            <ActionButton type="submit" size="hero" className="w-full" aria-busy={busy} disabled={busy}>
+            <ActionButton type="submit" size="hero" className="w-full" aria-busy={busy} disabled={busy} sfx="go">
               {busy ? 'Signing in…' : 'Sign in'}
             </ActionButton>
             {formError ? (
               <div role="alert">
                 <CaptionBox tone="red">
-                  <p className="font-display text-[40px] font-bold text-ivory" aria-hidden>
-                    DENIED
+                  <p className="zi-stamp font-display text-[40px] font-bold text-ivory" aria-hidden>
+                    ACCESS DENIED
                   </p>
                   <p className="font-display text-xs font-semibold tracking-[0.12em] text-ivory uppercase">Sign in failed</p>
                   <p className="text-[15px] font-medium text-ivory">{formError}</p>
@@ -195,7 +269,7 @@ export function LoginPage() {
       </form>
       {granted ? (
         <div className="pointer-events-none fixed inset-0 grid place-items-center">
-          <CaptionBox tone="red" className="-rotate-1">
+          <CaptionBox tone="red" className="zi-stamp">
             <p className="font-display text-5xl font-bold text-ivory" aria-hidden>
               ACCESS GRANTED
             </p>

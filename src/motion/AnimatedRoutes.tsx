@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, usePresence } from 'motion/react'
 import { useLocation, useNavigationType } from 'react-router'
 import { CurlOverlay } from '@/motion/CurlOverlay'
@@ -79,10 +80,12 @@ function PageLayer({ children, push }: { children: ReactNode; push: boolean }) {
   }, [isPresent, push])
 
   return (
-    <div ref={ref}>
-      {children}
-      {curl ? <CurlOverlay c={curl.c} width={curl.width} height={curl.height} /> : null}
-    </div>
+    <>
+      <div ref={ref}>{children}</div>
+      {curl && typeof document !== 'undefined'
+        ? createPortal(<CurlOverlay c={curl.c} width={curl.width} height={curl.height} />, document.body)
+        : null}
+    </>
   )
 }
 
