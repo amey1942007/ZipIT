@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/App'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 
-const pages: Array<[hash: string, title: string]> = [
+const pages: Array<[hash: string, title: string | RegExp]> = [
   ['#/login', 'Login'],
-  ['#/', 'Home'],
+  ['#/', /Zip it/],
   ['#/profile', 'Profile'],
   ['#/submissions', 'Submissions'],
   ['#/leaderboard', 'Leaderboard'],

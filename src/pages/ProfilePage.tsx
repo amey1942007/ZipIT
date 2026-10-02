@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PASSWORD_MIN } from '@/config/site'
+import { ActionButton } from '@/components/comic/ActionButton'
+import { HudReadout } from '@/components/comic/HudReadout'
+import { Panel } from '@/components/comic/Panel'
 import { PageFrame } from '@/components/PageFrame'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/lib/auth'
@@ -79,18 +81,23 @@ export function ProfilePage() {
 
   return (
     <PageFrame title="Profile">
-      <section className="grid max-w-lg gap-3">
+      <Panel fill="maroon">
+      <section className="grid max-w-lg gap-3 p-4 text-ivory">
+        <HudReadout>TEAM NAME</HudReadout>
         <h2 className="text-h4">Team name</h2>
         <form className="grid gap-3" onSubmit={onName}>
           <Label htmlFor="team-name">Name</Label>
           <Input id="team-name" value={name} onChange={(event) => setName(event.target.value)} className="h-11" />
-          <Button type="submit" className="h-11 w-fit rounded-full text-white" disabled={busy || !team}>
+          <ActionButton type="submit" disabled={busy || !team}>
             Save name
-          </Button>
-          {nameMessage ? <p className="text-text-muted">{nameMessage}</p> : null}
+          </ActionButton>
+          {nameMessage ? <p>{nameMessage.includes('saved') ? <HudReadout>SAVED</HudReadout> : null} {nameMessage}</p> : null}
         </form>
       </section>
-      <section className="grid max-w-lg gap-3">
+      </Panel>
+      <Panel fill="maroon">
+      <section className="grid max-w-lg gap-3 p-4 text-ivory">
+        <HudReadout>PASSWORD</HudReadout>
         <h2 className="text-h4">Password</h2>
         <form className="grid gap-3" onSubmit={onPassword}>
           <Label htmlFor="new-password">New password</Label>
@@ -103,13 +110,16 @@ export function ProfilePage() {
             onChange={(event) => setPassword(event.target.value)}
             className="h-11"
           />
-          <Button type="submit" className="h-11 w-fit rounded-full text-white" disabled={busy || !team}>
+          <ActionButton type="submit" disabled={busy || !team}>
             Update password
-          </Button>
-          {passwordMessage ? <p className="text-text-muted">{passwordMessage}</p> : null}
+          </ActionButton>
+          {passwordMessage ? <p>{passwordMessage.includes('updated') ? <HudReadout>SAVED</HudReadout> : null} {passwordMessage}</p> : null}
         </form>
       </section>
-      <section className="grid max-w-lg gap-3">
+      </Panel>
+      <Panel fill="maroon">
+      <section className="grid max-w-lg gap-3 p-4 text-ivory">
+        <HudReadout>AVATAR</HudReadout>
         <h2 className="text-h4">Avatar</h2>
         {preview ? <img src={preview} alt="" width={96} height={96} className="size-24 rounded-full object-cover" /> : null}
         <Label htmlFor="avatar">PNG, JPEG, or WebP, up to 2 MB</Label>
@@ -120,10 +130,9 @@ export function ProfilePage() {
           disabled={busy || !team}
           onChange={(event) => void onAvatar(event.target.files?.[0])}
         />
-        <Button
+        <ActionButton
           type="button"
-          variant="outline"
-          className="h-11 w-fit rounded-full"
+          variant="ghost"
           disabled={busy || !team?.avatar_path}
           onClick={() => {
             if (!team) return
@@ -136,9 +145,10 @@ export function ProfilePage() {
           }}
         >
           Remove avatar
-        </Button>
-        {avatarMessage ? <p className="text-text-muted">{avatarMessage}</p> : null}
+        </ActionButton>
+        {avatarMessage ? <p>{/updated|removed/i.test(avatarMessage) ? <HudReadout>SAVED</HudReadout> : null} {avatarMessage}</p> : null}
       </section>
+      </Panel>
     </PageFrame>
   )
 }

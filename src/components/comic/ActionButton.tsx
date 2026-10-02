@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 
@@ -30,7 +30,7 @@ export function ActionButton({
   const classes = cn('zi-abtn', VARIANT[variant], size === 'hero' && 'zi-abtn-hero', className)
   if (to) {
     return (
-      <Link to={to} className={classes}>
+      <Link to={to} className={classes} onClick={(event) => rest.onClick?.(event as unknown as MouseEvent<HTMLButtonElement>)}>
         {children}
       </Link>
     )

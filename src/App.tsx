@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
+import { AnimatedRoutes } from '@/motion/AnimatedRoutes'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { AppShell } from '@/components/shell/Shell'
 import { Toaster } from '@/components/ui/sonner'
@@ -36,12 +37,11 @@ function RequireSession({ admin = false }: { admin?: boolean }) {
   return <Outlet />
 }
 
-export default function App() {
+function RoutedApp() {
+  const location = useLocation()
   return (
-    <AuthProvider>
-      <HashRouter>
-        <Toaster />
-        <Routes>
+    <AnimatedRoutes>
+      <Routes location={location}>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ShellLayout />}>
             <Route path="/" element={<HomePage />} />
@@ -58,7 +58,17 @@ export default function App() {
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Route>
-        </Routes>
+      </Routes>
+    </AnimatedRoutes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <HashRouter>
+        <Toaster />
+        <RoutedApp />
       </HashRouter>
     </AuthProvider>
   )

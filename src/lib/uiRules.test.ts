@@ -4,7 +4,7 @@ import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broad
 import { friendlyDbError, initials, loginEmail } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
 import { buildSlots } from '@/lib/slots'
-import { firstUploadError } from '@/lib/uploadChecks'
+import { firstUploadError, uploadCheckList } from '@/lib/uploadChecks'
 
 const webp = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50,
@@ -18,6 +18,17 @@ describe('upload checks', () => {
     expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 0 })).toMatch(/empty/)
     expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 262_145 })).toMatch(/256 KB/)
     expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 12 })).toBeNull()
+  })
+
+  it('matches the first failing chip', () => {
+    const samples = [
+      { names: ['a.py', 'b.py'], name: 'a.py', size: 10 },
+      { names: ['a.py'], name: 'a.py', size: 12 },
+      { names: ['a.py'], name: 'a.py', size: 0 },
+    ]
+    for (const sample of samples) {
+      expect(firstUploadError(sample)).toBe(uploadCheckList(sample).find((check) => !check.ok)?.message ?? null)
+    }
   })
 })
 

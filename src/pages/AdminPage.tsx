@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router'
+import { ActionButton } from '@/components/comic/ActionButton'
+import { ComicTabs } from '@/components/comic/ComicTabs'
 import { PageFrame } from '@/components/PageFrame'
-import { Button } from '@/components/ui/button'
 import {
   downloadSubmission,
   fetchAllSubmissions,
@@ -16,7 +17,6 @@ import {
 import type { Tables } from '@/lib/database.types'
 import { formatIst, formatScore } from '@/lib/format'
 import { compareRanking } from '@/lib/ranking'
-import { cn } from '@/lib/utils'
 
 const TABS = [
   ['teams', 'Teams'],
@@ -84,20 +84,11 @@ export function AdminPage() {
 
   return (
     <PageFrame title="Admin">
-      <nav className="flex flex-wrap gap-2" aria-label="Admin">
-        {TABS.map(([id, label]) => (
-          <Link
-            key={id}
-            to={`/admin/${id}`}
-            className={cn(
-              'inline-flex h-11 items-center rounded-full border px-4 font-semibold',
-              tab === id ? 'border-gold bg-gold text-on-gold' : 'border-border text-text',
-            )}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <ComicTabs
+        label="Admin"
+        current={`/admin/${tab}`}
+        tabs={TABS.map(([id, label]) => ({ to: `/admin/${id}`, label }))}
+      />
       <p>The admin page has no write actions; the site is view-only for the admin.</p>
       {message ? <p className="text-text-muted">{message}</p> : null}
 
@@ -165,10 +156,9 @@ export function AdminPage() {
                       <Link to={`/arena/${row.id}?team=${row.team_id}`} className="font-semibold text-gold">
                         Open replay
                       </Link>
-                      <Button
+                        <ActionButton
                         type="button"
-                        variant="outline"
-                        className="h-11 rounded-full"
+                        variant="ghost"
                         onClick={() => {
                           void downloadSubmission(row.file_path)
                             .then(setCode)
@@ -176,7 +166,7 @@ export function AdminPage() {
                         }}
                       >
                         View code
-                      </Button>
+                      </ActionButton>
                     </div>
                   </td>
                 </tr>

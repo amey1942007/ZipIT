@@ -213,7 +213,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
                       variant="destructive"
                       onClick={() => {
                         void supabase?.auth.signOut()
-                        navigate('/login')
+                        navigate('/login', { state: { ziTurn: true } })
                       }}
                     >
                       <LogOut /> Sign out

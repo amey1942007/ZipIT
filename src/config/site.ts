@@ -19,6 +19,8 @@ export const DEFAULT_GRID = 6
 export const SPEEDS = [1, 4, 16, 64] as const
 export const SPEED_STEPS_PER_S = { 1: 8, 4: 32, 16: 128, 64: 512 } as const
 export const LIVE_ANNOUNCE_THROTTLE_MS = 5_000
+/** Logged-out leaderboard and the home top-3 panel share this cap. 0 hides both. */
+export const PUBLIC_BOARD_TOP_N = 10
 export const PYODIDE_VERSION = '314.0.7'
 export const PYODIDE_INDEX_URL = `${import.meta.env.BASE_URL}pyodide/${PYODIDE_VERSION}/`
 export const PYODIDE_TOTAL_BYTES = 13_500_000

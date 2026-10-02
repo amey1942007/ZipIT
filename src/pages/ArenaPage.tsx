@@ -6,8 +6,11 @@ import type { ReplayPuzzle, ReplayStep } from '@/arena/replayContract'
 import { DEFAULT_GRID, GRID_SIZES, SPEEDS, SPEED_STEPS_PER_S } from '@/config/site'
 import { useCellSize } from '@/components/arena/useCellSize'
 import { ZipBoard } from '@/components/arena/ZipBoard'
+import { ActionButton } from '@/components/comic/ActionButton'
+import { HudReadout } from '@/components/comic/HudReadout'
+import { Panel } from '@/components/comic/Panel'
+import { Sfx } from '@/components/comic/Sfx'
 import { PageFrame } from '@/components/PageFrame'
-import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/auth'
 import { fetchReplay, fetchSubmissions } from '@/lib/data'
 import { loadDemoZip, type DemoZip } from '@/lib/demo'
@@ -171,6 +174,10 @@ export function ArenaPage() {
   }
 
   const playbackOff = mode === 'fresh' || steps.length === 0
+  const solved = Boolean(
+    frame && puzzle && frame.path.length === puzzle.rows * puzzle.cols && frame.waypointsReached === puzzle.waypoints.length,
+  )
+  const modeLabel = viewOnly ? `VIEW ONLY · ${viewedTeam}` : mode === 'demo' ? 'DEMO' : mode === 'fresh' ? 'FRESH' : 'REPLAY'
   const depth = frame?.maxDepth ?? 0
   const score = mode === 'fresh' || !puzzle ? null : replayScore(depth, puzzle.rows, puzzle.cols)
 
@@ -178,6 +185,7 @@ export function ArenaPage() {
     <PageFrame title="Arena">
       {noRuns ? <p className="rounded-xl border border-border bg-surface px-4 py-3">No runs yet</p> : null}
       <div className="flex flex-wrap items-center gap-2">
+        <HudReadout>{modeLabel}</HudReadout>
         <span className="rounded-full border border-gold px-3 py-1 font-display text-xs font-semibold tracking-[0.12em] text-gold">
           {mode === 'demo' ? 'Demo Zip with solution' : mode === 'fresh' ? 'New Zip' : 'Saved run'}
         </span>
@@ -197,6 +205,11 @@ export function ArenaPage() {
             </Link>
           </p>
         ) : puzzle && frame ? (
+          <Panel fill="maroon" className="relative p-4 sm:p-6">
+            <HudReadout className="mb-3">{modeLabel}</HudReadout>
+            {Array.from({ length: Math.min(3, frame.waypointsReached) }, (_, index) => (
+              <HudReadout key={index} className="ml-2">{`NODE 0${frame.waypointsReached - index} · STEP ${index}`}</HudReadout>
+            ))}
           <ZipBoard
             puzzle={puzzle}
             path={mode === 'fresh' ? [] : frame.path}
@@ -206,22 +219,26 @@ export function ArenaPage() {
             showLine={mode !== 'fresh'}
             playing={playing && mode !== 'fresh'}
           />
+            {solved ? <Sfx preset="arena" stamp label="ZIP IT!" /> : null}
+            {solved ? <p className="sr-only">Path complete. Every cell visited.</p> : null}
+          </Panel>
         ) : (
           <p className="text-text-muted">Loading the board…</p>
         )}
-        <div ref={controlsRef} className="grid min-w-0 max-w-md gap-4">
+        <Panel fill="plain" className="min-w-0">
+        <div ref={controlsRef} className="grid max-w-md gap-4 p-4">
+          <HudReadout>PLAYBACK</HudReadout>
           <p className="font-mono font-bold text-text-muted tabular-nums">
             {REPLAY_SCORE_LABEL}: {score == null ? '—' : score}
           </p>
           {mode === 'demo' ? <p className="text-sm text-text-muted">Official score is hidden on the demo.</p> : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" className="h-11 rounded-full text-white" disabled={playbackOff} onClick={() => setPlaying((value) => !value)}>
+            <ActionButton type="button" disabled={playbackOff} onClick={() => setPlaying((value) => !value)}>
               {playing ? 'Pause' : 'Play'}
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
               type="button"
-              variant="outline"
-              className="h-11 rounded-full"
               disabled={playbackOff}
               onClick={() => {
                 setPlaying(false)
@@ -229,11 +246,10 @@ export function ArenaPage() {
               }}
             >
               Step back
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
+              variant="ghost"
               type="button"
-              variant="outline"
-              className="h-11 rounded-full"
               disabled={playbackOff}
               onClick={() => {
                 setPlaying(false)
@@ -241,9 +257,9 @@ export function ArenaPage() {
               }}
             >
               Step forward
-            </Button>
+            </ActionButton>
           </div>
-          <label className="grid gap-2 text-sm text-text-muted">
+          <label className="grid gap-2 text-sm text-ivory-muted">
             Seek
             <input
               type="range"
@@ -257,18 +273,11 @@ export function ArenaPage() {
               }}
             />
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Playback speed">
             {SPEEDS.map((value) => (
-              <Button
-                key={value}
-                type="button"
-                variant={value === speed ? 'default' : 'outline'}
-                className="h-11 rounded-full text-white"
-                disabled={playbackOff}
-                onClick={() => setSpeed(value)}
-              >
+              <ActionButton key={value} type="button" variant={value === speed ? 'primary' : 'ghost'} disabled={playbackOff} onClick={() => setSpeed(value)}>
                 {value}×
-              </Button>
+              </ActionButton>
             ))}
           </div>
           {viewOnly ? null : (
@@ -276,7 +285,7 @@ export function ArenaPage() {
               <label className="grid gap-1 text-sm">
                 Grid
                 <select
-                  className="h-11 rounded-xl border border-border-strong bg-surface-2 px-3"
+                  className="h-11 rounded border-2 border-[rgba(255,246,232,.6)] bg-comic-maroon px-3 text-ivory"
                   value={grid}
                   onChange={(event) => setGrid(Number(event.target.value))}
                 >
@@ -287,15 +296,16 @@ export function ArenaPage() {
                   ))}
                 </select>
               </label>
-              <Button type="button" className="h-11 rounded-full text-white" onClick={newZip}>
+              <ActionButton type="button" onClick={newZip}>
                 New Zip
-              </Button>
-              <Button type="button" variant="outline" className="h-11 rounded-full" onClick={showDemo} disabled={!demo}>
+              </ActionButton>
+              <ActionButton type="button" variant="ghost" onClick={showDemo} disabled={!demo}>
                 Previous Zip
-              </Button>
+              </ActionButton>
             </div>
           )}
         </div>
+        </Panel>
       </div>
     </PageFrame>
   )
