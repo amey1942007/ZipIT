@@ -297,6 +297,7 @@ export interface ReplayCheck {
   invalid: number
   status: RunStatus
   maxDepth: number
+  path: number[]
   error: string | null
 }
 
@@ -309,6 +310,7 @@ export function replayLog(puzzle: ReplayPuzzle, steps: readonly ReplayStep[]): R
     invalid: 0,
     status: 'error',
     maxDepth: 0,
+    path: [],
     error,
   })
   const sim = makeSim(puzzle)
@@ -366,6 +368,7 @@ export function replayLog(puzzle: ReplayPuzzle, steps: readonly ReplayStep[]): R
     invalid,
     status,
     maxDepth,
+    path: sim.path.slice(),
     error: null,
   }
 }
