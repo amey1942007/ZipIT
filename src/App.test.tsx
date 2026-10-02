@@ -23,6 +23,20 @@ describe('foundation', () => {
     expect(supabase).toBeNull()
   })
 
+  it('renders the three login panels at full opacity', () => {
+    window.location.hash = '#/login'
+    render(<App />)
+    const panels = document.querySelectorAll('.zi-login-id, .zi-login-key, .zi-login-go')
+    expect(panels).toHaveLength(3)
+    for (const panel of panels) {
+      expect(panel).toBeVisible()
+      const opacity = getComputedStyle(panel).opacity
+      expect(opacity === '' || Number(opacity) > 0).toBe(true)
+    }
+    expect(screen.getByLabelText('Username')).toBeVisible()
+    expect(screen.getByLabelText('Password')).toBeVisible()
+  })
+
   it.each(pages)('renders %s', (hash, title) => {
     window.location.hash = hash
     render(<App />)
