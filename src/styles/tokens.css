@@ -1,0 +1,315 @@
+/* =============================================================================
+   ZipIT design tokens: Token set C "Ignition" (FINAL, dark mode only)
+   Source of truth: /workspace/zipit-design/zipit-ui-spec-v1.md §2
+   Usage (src/index.css):
+       @import "tailwindcss";
+       @import "./styles/tokens.css";
+   Plain HTML (mocks): <link rel="stylesheet" href="../tokens.css">. Browsers
+   skip the @theme block below as an unknown at-rule, so :root still applies.
+   Original red/gold HUD theme. No Marvel IP.
+   ============================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------- Colour: base ---------- */
+  --zi-bg:               #1C0509;  /* page background */
+  --zi-surface:          #2B0A10;  /* cards, tables, panels, grid cells */
+  --zi-surface-2:        #3D0E17;  /* hover, inputs, own-team row */
+  --zi-border:           #5A1520;  /* decorative hairlines only (1.45:1) */
+  --zi-border-strong:    #B0606C;  /* input / control boundaries (3.72:1 on surface-2) */
+
+  /* ---------- Colour: brand ---------- */
+  --zi-primary:          #E01E37;  /* primary red fills; label MUST be #FFFFFF / 600 (4.76:1) */
+  --zi-primary-hover:    #C8172E;  /* white on it 5.80:1 */
+  --zi-on-primary:       #FFFFFF;
+  --zi-red-text:         #FF8A96;  /* red text / links on dark (8.68:1) */
+  --zi-gold:             #FFC83D;  /* accent, CTA fill, focus ring (12.63:1) */
+  --zi-gold-hover:       #FFD666;
+  --zi-on-gold:          #1C0509;  /* text on gold (12.63:1) */
+
+  /* ---------- Colour: text ---------- */
+  --zi-text:             #FFF6E8;  /* 18.23:1 */
+  --zi-text-muted:       #D9B8A8;  /* 10.58:1 */
+  --zi-text-disabled:    #9E7F78;  /* 5.36:1 (disabled is exempt, kept legible anyway) */
+
+  /* ---------- Colour: status (never colour alone: rise=▲, fall=▼, plus icons) ---------- */
+  --zi-success:          #7CFFB2;  /* success / rise */
+  --zi-danger:           #FFB3B8;  /* danger / fall / errors */
+  --zi-warning:          #FFA24C;  /* amber: run cut off, reconnecting */
+  --zi-on-status:        #1C0509;  /* text on success/danger/warning fills */
+
+  /* ---------- Colour: translucent helpers ---------- */
+  --zi-bar-bg:           rgba(43, 10, 16, 0.85);      /* top bar / bottom tabs: surface @85% */
+  --zi-hairline-gold:    rgba(255, 200, 61, 0.35);    /* top bar bottom hairline */
+  --zi-border-gold-60:   rgba(255, 200, 61, 0.60);    /* hover border */
+  --zi-scrim:            rgba(28, 5, 9, 0.80);        /* dialog overlay */
+  --zi-flash-rise:       rgba(124, 255, 178, 0.18);   /* leaderboard rise flash */
+  --zi-flash-fall:       rgba(255, 179, 184, 0.14);   /* leaderboard fall flash */
+  --zi-flash-invalid:    rgba(255, 179, 184, 0.55);   /* Arena invalid-pick cell flash */
+
+  /* ---------- Colour: Arena board ---------- */
+  --zi-cell:             #2B0A10;                     /* = surface */
+  --zi-cell-line:        #5A1520;                     /* 1px grid lines */
+  --zi-cell-visited:     rgba(255, 200, 61, 0.14);    /* cell on current path (≈ #492516) */
+  --zi-cell-backtracked: rgba(255, 179, 184, 0.12);   /* hatch colour for popped cells */
+  --zi-path:             #FFC83D;                     /* path stroke (11.77:1 vs cell) */
+  --zi-wall:             #FFF6E8;                     /* walls (16.99:1 vs cell) */
+  --zi-waypoint-fill:    #FFC83D;
+  --zi-waypoint-text:    #1C0509;
+  --zi-head-fill:        #FFFFFF;
+  --zi-head-ring:        #E01E37;                     /* 3.08:1 vs gold path */
+
+  /* ---------- Hazard stripe (frozen) ---------- */
+  --zi-hazard: repeating-linear-gradient(45deg, #FFC83D 0 12px, #1C0509 12px 24px);
+
+  /* ---------- Typography ---------- */
+  --zi-font-display: "Orbitron", "Exo 2", system-ui, sans-serif;   /* 700/900, only at >= 21px */
+  --zi-font-body:    "Exo 2", system-ui, -apple-system, "Segoe UI", sans-serif; /* 400/500/600 */
+  --zi-font-mono:    "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; /* 700 numbers, 400 code */
+
+  /* Type scale: base 16px, ratio 1.333 */
+  --zi-text-caption: 0.75rem;    /* 12px */
+  --zi-text-body:    1rem;       /* 16px */
+  --zi-text-h4:      1.333rem;   /* 21px  (smallest Orbitron size) */
+  --zi-text-h3:      1.777rem;   /* 28px */
+  --zi-text-h2:      2.369rem;   /* 38px */
+  --zi-text-h1:      3.157rem;   /* 50px */
+  --zi-text-hero:    4.209rem;   /* 67px */
+  --zi-leading-body:    1.5;
+  --zi-leading-heading: 1.15;
+  --zi-tracking-heading: 0.02em;
+  --zi-tracking-label:   0.12em;  /* 12px uppercase labels (Exo 2 600) */
+
+  /* ---------- Spacing: 8px base (4px allowed inside controls) ---------- */
+  --zi-space-half: 4px;
+  --zi-space-1:  8px;
+  --zi-space-2:  16px;
+  --zi-space-3:  24px;
+  --zi-space-4:  32px;
+  --zi-space-5:  48px;
+  --zi-space-6:  64px;
+  --zi-space-7:  96px;
+  --zi-space-8:  128px;
+
+  /* ---------- Layout ---------- */
+  --zi-topbar-h-desktop: 64px;
+  --zi-topbar-h-mobile:  56px;
+  --zi-tabbar-h:         64px;
+  --zi-content-max:      1280px;
+  --zi-tap-min:          44px;
+
+  /* ---------- Radius ---------- */
+  --zi-radius-card:  12px;
+  --zi-radius-input: 12px;
+  --zi-radius-pill:  999px;   /* buttons and chips */
+  --zi-radius-cell:  4px;     /* Arena cells */
+
+  /* ---------- Shadows and glows ---------- */
+  --zi-glow-gold:      0 0 0 2px #FFC83D, 0 0 40px rgba(255, 200, 61, 0.45);     /* CTA, new #1 */
+  --zi-glow-gold-soft: 0 0 0 1px rgba(255, 200, 61, 0.60), 0 0 24px rgba(255, 200, 61, 0.25); /* 3A hover */
+  --zi-glow-red:       0 12px 40px rgba(224, 30, 55, 0.50);
+  --zi-shadow-panel:   0 8px 32px rgba(0, 0, 0, 0.60);
+  --zi-text-glow-gold: 0 0 12px rgba(255, 200, 61, 0.60);
+  --zi-shine: linear-gradient(110deg, transparent 40%, rgba(255, 200, 61, 0.35) 50%, transparent 60%);
+  --zi-scanlines: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px);
+  --zi-focus-ring: 0 0 0 6px rgba(255, 200, 61, 0.25);
+
+  /* ---------- Motion: durations ---------- */
+  --zi-dur-instant:   0ms;
+  --zi-dur-press:     120ms;
+  --zi-dur-fast:      150ms;   /* reduced-motion opacity fallback */
+  --zi-dur-hover:     180ms;
+  --zi-dur-invalid:   180ms;   /* Arena invalid flash + shake */
+  --zi-dur-enter:     200ms;   /* page in (4B), dialogs, chips */
+  --zi-dur-digit:     250ms;   /* Arena digit roll (3B) */
+  --zi-dur-scan:      350ms;   /* 4B scan line */
+  --zi-dur-flash-gold: 400ms;  /* digit change flash */
+  --zi-dur-panel:     420ms;   /* 3A panel reveal */
+  --zi-dur-reorder:   600ms;   /* leaderboard spring settle (approx.) */
+  --zi-dur-ticker:    800ms;   /* NumberTicker settle (approx.) */
+  --zi-dur-shine:     800ms;   /* new #1 sweep */
+  --zi-dur-flash-fall: 900ms;
+  --zi-dur-flash-rise: 1200ms;
+  --zi-dur-shimmer:   1200ms;  /* skeleton / Scoring… */
+  --zi-dur-breathe:   3000ms;
+
+  /* ---------- Motion: easings ---------- */
+  --zi-ease-forged:  cubic-bezier(0.22, 1, 0.36, 1);   /* 3A hover / press */
+  --zi-ease-reveal:  cubic-bezier(0.16, 1, 0.3, 1);    /* 3A panel reveal, dialogs */
+  --zi-ease-in:      cubic-bezier(0.4, 0, 1, 1);       /* 4B page out ("ease-in") */
+  --zi-ease-enter:   cubic-bezier(0.2, 0, 0, 1);       /* 4B page in */
+  --zi-ease-scan:    cubic-bezier(0.65, 0, 0.35, 1);   /* 4B scan line */
+  --zi-ease-digit:   cubic-bezier(0.3, 0, 0.2, 1);     /* 3B digit roll */
+  --zi-ease-inout:   cubic-bezier(0.37, 0, 0.63, 1);   /* sine in-out: breathing, glow pulse */
+  --zi-ease-linear:  linear;
+
+  /* ---------- shadcn/ui semantic aliases (consumed by components.json theme) ---------- */
+  --background:           var(--zi-bg);
+  --foreground:           var(--zi-text);
+  --card:                 var(--zi-surface);
+  --card-foreground:      var(--zi-text);
+  --popover:              var(--zi-surface-2);
+  --popover-foreground:   var(--zi-text);
+  --primary:              var(--zi-primary);
+  --primary-foreground:   var(--zi-on-primary);
+  --secondary:            var(--zi-surface-2);
+  --secondary-foreground: var(--zi-text);
+  --muted:                var(--zi-surface-2);
+  --muted-foreground:     var(--zi-text-muted);
+  --accent:               var(--zi-gold);
+  --accent-foreground:    var(--zi-on-gold);
+  --destructive:          var(--zi-primary);
+  --destructive-foreground: var(--zi-on-primary);
+  --border:               var(--zi-border);
+  --input:                var(--zi-border-strong);
+  --ring:                 var(--zi-gold);
+  --radius:               var(--zi-radius-card);
+}
+
+/* Reduced motion: collapse token durations so CSS transitions become instant/opacity-only. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --zi-dur-hover:   150ms;
+    --zi-dur-press:   0ms;
+    --zi-dur-panel:   150ms;
+    --zi-dur-scan:    0ms;
+    --zi-dur-digit:   0ms;
+    --zi-dur-shimmer: 0ms;
+    --zi-dur-breathe: 0ms;
+    --zi-dur-shine:   0ms;
+  }
+}
+
+/* =============================================================================
+   Tailwind v4 mapping. `inline` so utilities reference the live CSS variables.
+   Utilities: bg-bg, bg-surface, text-gold, border-border-strong, font-display,
+   text-h3, p-zi-3, rounded-card, shadow-glow-gold, ease-forged, duration-* etc.
+   ============================================================================= */
+@theme inline {
+  /* colours */
+  --color-bg:              var(--zi-bg);
+  --color-surface:         var(--zi-surface);
+  --color-surface-2:       var(--zi-surface-2);
+  --color-border:          var(--zi-border);
+  --color-border-strong:   var(--zi-border-strong);
+  --color-primary:         var(--zi-primary);
+  --color-primary-hover:   var(--zi-primary-hover);
+  --color-primary-foreground: var(--zi-on-primary);
+  --color-red-text:        var(--zi-red-text);
+  --color-gold:            var(--zi-gold);
+  --color-gold-hover:      var(--zi-gold-hover);
+  --color-on-gold:         var(--zi-on-gold);
+  --color-text:            var(--zi-text);
+  --color-text-muted:      var(--zi-text-muted);
+  --color-text-disabled:   var(--zi-text-disabled);
+  --color-success:         var(--zi-success);
+  --color-danger:          var(--zi-danger);
+  --color-warning:         var(--zi-warning);
+  --color-on-status:       var(--zi-on-status);
+  --color-cell:            var(--zi-cell);
+  --color-cell-line:       var(--zi-cell-line);
+  --color-path:            var(--zi-path);
+  --color-wall:            var(--zi-wall);
+
+  /* shadcn semantic colours */
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-secondary:            var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-accent:               var(--accent);
+  --color-accent-foreground:    var(--accent-foreground);
+  --color-destructive:          var(--destructive);
+  --color-input:                var(--input);
+  --color-ring:                 var(--ring);
+
+  /* fonts */
+  --font-display: var(--zi-font-display);
+  --font-body:    var(--zi-font-body);
+  --font-sans:    var(--zi-font-body);
+  --font-mono:    var(--zi-font-mono);
+
+  /* type scale */
+  --text-caption: var(--zi-text-caption);
+  --text-caption--line-height: 1.5;
+  --text-body: var(--zi-text-body);
+  --text-body--line-height: 1.5;
+  --text-h4: var(--zi-text-h4);
+  --text-h4--line-height: 1.15;
+  --text-h3: var(--zi-text-h3);
+  --text-h3--line-height: 1.15;
+  --text-h2: var(--zi-text-h2);
+  --text-h2--line-height: 1.15;
+  --text-h1: var(--zi-text-h1);
+  --text-h1--line-height: 1.15;
+  --text-hero: var(--zi-text-hero);
+  --text-hero--line-height: 1.05;
+
+  /* spacing: keep the 4px multiplier and add named 8px-scale steps */
+  --spacing: 0.25rem;
+  --spacing-zi-half: var(--zi-space-half);
+  --spacing-zi-1: var(--zi-space-1);
+  --spacing-zi-2: var(--zi-space-2);
+  --spacing-zi-3: var(--zi-space-3);
+  --spacing-zi-4: var(--zi-space-4);
+  --spacing-zi-5: var(--zi-space-5);
+  --spacing-zi-6: var(--zi-space-6);
+  --spacing-zi-7: var(--zi-space-7);
+  --spacing-zi-8: var(--zi-space-8);
+  --spacing-tap: var(--zi-tap-min);
+
+  /* radius */
+  --radius-card:  var(--zi-radius-card);
+  --radius-input: var(--zi-radius-input);
+  --radius-pill:  var(--zi-radius-pill);
+  --radius-cell:  var(--zi-radius-cell);
+  --radius-lg: var(--zi-radius-card);
+  --radius-md: calc(var(--zi-radius-card) - 2px);
+  --radius-sm: calc(var(--zi-radius-card) - 4px);
+
+  /* shadows / glows */
+  --shadow-glow-gold:      var(--zi-glow-gold);
+  --shadow-glow-gold-soft: var(--zi-glow-gold-soft);
+  --shadow-glow-red:       var(--zi-glow-red);
+  --shadow-panel:          var(--zi-shadow-panel);
+  --shadow-focus:          var(--zi-focus-ring);
+  --text-shadow-glow-gold: var(--zi-text-glow-gold);
+
+  /* easings */
+  --ease-forged: var(--zi-ease-forged);
+  --ease-reveal: var(--zi-ease-reveal);
+  --ease-enter:  var(--zi-ease-enter);
+  --ease-scan:   var(--zi-ease-scan);
+  --ease-digit:  var(--zi-ease-digit);
+  --ease-sine:   var(--zi-ease-inout);
+
+  /* breakpoints: Tailwind defaults (sm 640, md 768, lg 1024, xl 1280). Spec uses sm + lg. */
+
+  /* animations */
+  --animate-shimmer: zi-shimmer 1200ms linear infinite;
+  --animate-breathe: zi-breathe 3000ms cubic-bezier(0.37, 0, 0.63, 1) infinite alternate;
+}
+
+@keyframes zi-shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes zi-breathe {
+  from { opacity: 0.7; }
+  to   { opacity: 1; }
+}
+
+/* ---------- Global base: focus ring (spec §6.1) ---------- */
+:where(a, button, input, select, textarea, summary, [role="button"], [role="tab"],
+       [role="slider"], [role="switch"], [role="option"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--zi-gold);
+  outline-offset: 2px;
+  box-shadow: var(--zi-focus-ring);
+}
+:where(a, button, input, select, textarea):focus:not(:focus-visible) { outline: none; }

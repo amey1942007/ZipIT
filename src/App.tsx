@@ -1,4 +1,7 @@
-import { HashRouter, Route, Routes } from 'react-router'
+import { HashRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
+import { AppShell } from '@/components/shell/Shell'
+import { Toaster } from '@/components/ui/sonner'
+import { useAuth, AuthProvider } from '@/lib/auth'
 import { AdminPage } from '@/pages/AdminPage'
 import { ArenaPage } from '@/pages/ArenaPage'
 import { HomePage } from '@/pages/HomePage'
@@ -7,18 +10,48 @@ import { LoginPage } from '@/pages/LoginPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SubmissionsPage } from '@/pages/SubmissionsPage'
 
+function ShellLayout() {
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  )
+}
+
+function RequireSession({ admin = false }: { admin?: boolean }) {
+  const { configured, ready, session, isAdmin } = useAuth()
+  const location = useLocation()
+  if (!configured) return <Outlet />
+  if (!ready) return <p className="px-6 py-10 text-text-muted">Loading…</p>
+  if (!session) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
+  if (admin && !isAdmin) return <Navigate to="/" replace />
+  return <Outlet />
+}
+
 export default function App() {
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<HomePage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/submissions" element={<SubmissionsPage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/arena" element={<ArenaPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
-    </HashRouter>
+    <AuthProvider>
+      <HashRouter>
+        <Toaster />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ShellLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route element={<RequireSession />}>
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/submissions" element={<SubmissionsPage />} />
+              <Route path="/arena" element={<ArenaPage />} />
+              <Route path="/arena/:submissionId" element={<ArenaPage />} />
+            </Route>
+            <Route element={<RequireSession admin />}>
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/:tab" element={<AdminPage />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </HashRouter>
+    </AuthProvider>
   )
 }
