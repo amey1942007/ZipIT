@@ -1,39 +1,26 @@
-import { useEffect, useState, type RefObject } from 'react'
-import { cellSize, type BoardBreakpoint } from '@/arena/boardGeometry'
+import { useEffect, useState } from 'react'
+import { BOARD_PAD, CELL_MIN } from '@/arena/boardGeometry'
 
-const GAP = 24
-
-function breakpoint(): BoardBreakpoint {
-  return window.matchMedia('(min-width: 1024px)').matches ? 'desktop' : 'mobile'
-}
-
-/** Measure the full row, then reserve the controls column on desktop so the board cannot stretch. */
-export function useCellSize(
-  cols: number,
-  rowRef: RefObject<HTMLDivElement | null>,
-  controlsRef: RefObject<HTMLDivElement | null>,
-): number {
-  const [cell, setCell] = useState(() => cellSize(cols, 'desktop', 1200))
+/** Fit the board to the square slot. The slot width is the column, not the playback panel. */
+export function useCellSize(cols: number, board: HTMLElement | null): number {
+  const [cell, setCell] = useState(() => CELL_MIN)
 
   useEffect(() => {
-    const row = rowRef.current
-    if (!row) return
+    if (!board) return
     const measure = () => {
-      const bp = breakpoint()
-      const controls = bp === 'desktop' ? (controlsRef.current?.offsetWidth ?? 0) + GAP : 0
-      const available = row.clientWidth > 0 ? row.clientWidth - controls : bp === 'desktop' ? 1200 : 358
-      setCell(cellSize(cols, bp, Math.max(available, 0)))
+      const available = board.clientWidth
+      const fit = Math.floor((available - 2 * BOARD_PAD - 6) / Math.max(1, cols))
+      setCell(Math.max(CELL_MIN, Number.isFinite(fit) ? fit : CELL_MIN))
     }
     measure()
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null
-    observer?.observe(row)
-    if (controlsRef.current) observer?.observe(controlsRef.current)
+    observer?.observe(board)
     window.addEventListener('resize', measure)
     return () => {
       observer?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [cols, rowRef, controlsRef])
+  }, [cols, board])
 
   return cell
 }

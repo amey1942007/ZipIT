@@ -13,6 +13,7 @@ import { fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/da
 import { formatIst, formatScore } from '@/lib/format'
 import { buildSlots } from '@/lib/slots'
 import { uploadCheckList } from '@/lib/uploadChecks'
+import { playZipped } from '@/lib/sfx'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useSubmissionFeed } from '@/lib/useLive'
 
@@ -62,6 +63,7 @@ export function SubmissionsPage() {
     if (!isSupabaseConfigured || !team) {
       setOutcome('ok')
       setMessage('Preview only. Nothing was uploaded.')
+      playZipped()
       setBusy(false)
       return
     }
@@ -69,6 +71,7 @@ export function SubmissionsPage() {
       await uploadSubmission(team.id, file)
       setOutcome('ok')
       setMessage('Uploaded. Scoring will update this page.')
+      playZipped()
       reload()
     } catch (error) {
       setOutcome('error')

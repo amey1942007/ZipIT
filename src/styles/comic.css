@@ -632,6 +632,39 @@
   }
 }
 
+/* Arena: explicit areas. `auto` + overflow:hidden collapsed the board to a sliver. */
+.zi-arena {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-items: start;
+  gap: 24px;
+  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+  grid-template-areas: "board play";
+}
+.zi-arena-board { grid-area: board; min-width: 0; }
+.zi-arena-play { grid-area: play; min-width: 0; }
+.zi-arena .zi-panel {
+  container-type: inline-size;
+  height: auto;
+  min-width: 0;
+}
+.zi-arena-square {
+  width: min(100%, calc(100svh - 96px));
+  min-width: 0;
+  max-width: 100%;
+  max-height: calc(100svh - 96px);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  overflow: hidden;
+}
+@media (max-width: 899px) {
+  .zi-arena {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "board" "play";
+  }
+}
+
 @keyframes zi-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }

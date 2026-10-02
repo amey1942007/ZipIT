@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Sfx } from '@/components/comic/Sfx'
+import { playClick } from '@/lib/sfx'
 
 /** Full-viewport stamp. Portaled so a transformed ancestor cannot trap it. */
 export function StampOverlay({ children }: { children: ReactNode }) {
@@ -21,6 +22,7 @@ export function ClickBurst() {
       if (!(target instanceof Element)) return
       if (!target.closest('a, button, [role="button"], label.zi-abtn')) return
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      playClick()
       const id = ++seq
       setPops((list) => [...list.slice(-8), { id, x: event.clientX, y: event.clientY, reduced }])
       window.setTimeout(() => {

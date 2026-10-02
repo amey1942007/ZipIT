@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { frameAt } from '@/arena/playback'
 import { REPLAY_SCORE_LABEL, replayScore } from '@/arena/scoreLocal'
@@ -53,9 +53,8 @@ export function ArenaPage() {
   const [note, setNote] = useState('')
   const [noRuns, setNoRuns] = useState(false)
   const [missing, setMissing] = useState(false)
-  const rowRef = useRef<HTMLDivElement>(null)
-  const controlsRef = useRef<HTMLDivElement>(null)
-  const cell = useCellSize(puzzle?.cols ?? DEFAULT_GRID, rowRef, controlsRef)
+  const [boardSlot, setBoardSlot] = useState<HTMLDivElement | null>(null)
+  const cell = useCellSize(puzzle?.cols ?? DEFAULT_GRID, boardSlot)
 
   useEffect(() => {
     let stop = false
@@ -196,7 +195,8 @@ export function ArenaPage() {
         ) : null}
       </div>
       {note ? <p className="text-text-muted">{note}</p> : null}
-      <div ref={rowRef} className="grid w-full min-w-0 items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <div className="zi-arena">
+        <div className="zi-arena-board">
         {missing ? (
           <p className="text-text-muted">
             Run not found.{' '}
@@ -206,27 +206,36 @@ export function ArenaPage() {
           </p>
         ) : puzzle && frame ? (
           <Panel fill="maroon" className="relative p-4 sm:p-6">
-            <HudReadout className="mb-3">{modeLabel}</HudReadout>
-            {Array.from({ length: Math.min(3, frame.waypointsReached) }, (_, index) => (
-              <HudReadout key={index} className="ml-2">{`NODE 0${frame.waypointsReached - index} · STEP ${index}`}</HudReadout>
-            ))}
-          <ZipBoard
-            puzzle={puzzle}
-            path={mode === 'fresh' ? [] : frame.path}
-            backtracked={mode === 'fresh' ? [] : frame.backtracked}
-            head={frame.head}
-            cell={cell}
-            showLine={mode !== 'fresh'}
-            playing={playing && mode !== 'fresh'}
-          />
-            {solved ? <Sfx preset="arena" stamp label="ZIP IT!" /> : null}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <HudReadout>{modeLabel}</HudReadout>
+              {Array.from({ length: Math.min(3, frame.waypointsReached) }, (_, index) => (
+                <HudReadout key={index}>{`NODE 0${frame.waypointsReached - index} · STEP ${index}`}</HudReadout>
+              ))}
+            </div>
+            <div ref={setBoardSlot} className="zi-arena-square">
+              <ZipBoard
+                puzzle={puzzle}
+                path={mode === 'fresh' ? [] : frame.path}
+                backtracked={mode === 'fresh' ? [] : frame.backtracked}
+                head={frame.head}
+                cell={cell}
+                showLine={mode !== 'fresh'}
+                playing={playing && mode !== 'fresh'}
+              />
+            </div>
+            {solved ? (
+              <span className="pointer-events-none absolute top-3 right-3">
+                <Sfx preset="arena" stamp label="ZIP IT!" />
+              </span>
+            ) : null}
             {solved ? <p className="sr-only">Path complete. Every cell visited.</p> : null}
           </Panel>
         ) : (
           <p className="text-text-muted">Loading the board…</p>
         )}
-        <Panel fill="plain" className="min-w-0">
-        <div ref={controlsRef} className="grid max-w-md gap-4 p-4">
+        </div>
+        <Panel fill="plain" className="zi-arena-play min-w-0">
+        <div className="grid gap-4 p-4">
           <HudReadout>PLAYBACK</HudReadout>
           <p className="font-mono font-bold text-text-muted tabular-nums">
             {REPLAY_SCORE_LABEL}: {score == null ? '—' : score}

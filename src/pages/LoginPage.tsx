@@ -16,6 +16,7 @@ import { PathMeter } from '@/components/comic/PathMeter'
 import { usePageTitle, Wordmark } from '@/components/shell/Shell'
 import { loginEmail } from '@/lib/format'
 import { distanceAlong, pathLength, pointsToD, type Point, type Rect } from '@/lib/gutterRoute'
+import { playZipped } from '@/lib/sfx'
 import { supabase } from '@/lib/supabase'
 
 function boxOf(root: HTMLElement, el: HTMLElement): Rect {
@@ -135,6 +136,7 @@ export function LoginPage() {
     const next = params.get('next')
     const target = next && next.startsWith('/') ? next : '/'
     setGranted(true)
+    playZipped()
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
       navigate(target, { replace: true, state: { ziTurn: true } })
