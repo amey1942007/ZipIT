@@ -24,6 +24,7 @@ describe('page turn decisions', () => {
     expect(decideKind({ ...base, key: 'admin' })).toBe('fade')
     expect(decideKind({ ...base, key: 'notfound' })).toBe('fade')
     expect(decideKind({ ...base, navType: 'REPLACE' })).toBe('cut')
+    expect(decideKind({ ...base, navType: 'REPLACE', prevKey: 'admin', key: 'login' })).toBe('cut')
     expect(decideKind({ ...base, navType: 'REPLACE', ziTurn: true })).toBe('turn')
     expect(decideKind({ ...base, mobile: true })).toBe('slide')
     expect(decideKind(base)).toBe('turn')
