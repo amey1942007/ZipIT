@@ -488,8 +488,9 @@
   from { opacity: 0; transform: translateX(48px) rotate(2deg); }
   to { opacity: 1; transform: none; }
 }
-.zi-enter-l { animation: zi-enter-l 240ms cubic-bezier(0.34, 1.6, 0.64, 1) both; }
-.zi-enter-r { animation: zi-enter-r 240ms cubic-bezier(0.34, 1.6, 0.64, 1) 60ms both; }
+/* forwards, not both: the base state stays visible if the animation never runs. */
+.zi-enter-l { animation: zi-enter-l 240ms cubic-bezier(0.34, 1.6, 0.64, 1) forwards; }
+.zi-enter-r { animation: zi-enter-r 240ms cubic-bezier(0.34, 1.6, 0.64, 1) 60ms forwards; }
 
 @media (max-width: 639px) {
   .zi-cbox-compact h1 { font-size: 24px; }
@@ -541,10 +542,21 @@
 .zi-slot-every { grid-area: p6; }
 .zi-slot-headline { grid-area: p7; }
 .zi-login-grid {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr 0.96fr;
+  grid-template-rows: minmax(440px, 1fr);
+  grid-template-areas: "id key go";
   gap: 16px;
   padding: 26px 32px 32px;
+  height: clamp(440px, calc(100svh - 108px), 572px);
+  min-height: 440px;
+}
+/* inline-size only: `size` + height:100% collapses when the row isn't definite. */
+.zi-login-grid .zi-panel {
+  container-type: inline-size;
+  min-height: 440px;
+  height: 100%;
 }
 .zi-login-id { grid-area: id; }
 .zi-login-key { grid-area: key; }
@@ -558,14 +570,22 @@
   }
   .zi-login-grid {
     grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(360px, auto) minmax(220px, auto);
     grid-template-areas: "id key" "go go";
+    height: auto;
+    min-height: 0;
     padding: 16px;
+  }
+  .zi-login-grid .zi-panel {
+    container-type: inline-size;
+    height: auto;
+    min-height: 220px;
   }
 }
 @media (max-width: 639px) {
   .zi-hero-grid {
     gap: 12px;
-    grid-template-rows: auto 132px 176px 120px 150px 110px;
+    grid-template-rows: minmax(220px, auto) 132px 176px 120px 150px 110px;
     grid-template-areas: "p1 p1" "p2 p2" "p3 p3" "p4 p5" "p6 p6" "p7 p7";
   }
   .zi-slot-headline { grid-area: p1; }
@@ -575,23 +595,26 @@
   .zi-slot-order { grid-area: p5; }
   .zi-slot-code { grid-area: p6; }
   .zi-slot-every { grid-area: p7; }
-  .zi-login-grid { grid-template-columns: 1fr; grid-template-areas: "id" "key" "go"; }
+  .zi-login-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-template-areas: "id" "key" "go";
+    height: auto;
+    min-height: 0;
+  }
+  .zi-login-grid .zi-panel {
+    container-type: inline-size;
+    height: auto;
+    min-height: 220px;
+  }
 }
 @media (min-width: 640px) {
+  /* Hero rows are a definite height (desktop fr of a fixed grid, tablet px tracks). */
   .zi-hero-grid .zi-panel {
     container-type: size;
     height: 100%;
+    min-height: 0;
   }
-  .zi-login-grid {
-    grid-template-rows: minmax(440px, 1fr);
-  }
-  .zi-login-grid .zi-panel {
-    container-type: size;
-    height: 100%;
-  }
-}
-@media (min-width: 640px) and (max-width: 1023px) {
-  .zi-login-grid { grid-template-rows: minmax(360px, auto) minmax(200px, auto); }
 }
 
 @keyframes zi-bob {
@@ -649,7 +672,6 @@
   to { transform: translateY(240px); }
 }
 
-.zi-login-grid { position: relative; min-height: clamp(440px, calc(100svh - 108px), 572px); }
 .zi-login-path path { transition: stroke-dashoffset 280ms var(--zi-ease-forged, cubic-bezier(0.2, 0.8, 0.2, 1)); }
 
 @keyframes zi-slam-a {
@@ -753,7 +775,6 @@
   .zi-zip-live { animation: none; opacity: 1; filter: drop-shadow(0 0 6px #fff6e8) drop-shadow(0 0 10px #ffc83d); }
   .zi-scan { display: none; }
   .zi-login-path path { transition: none; }
-  .zi-login-grid { min-height: 0; }
   .zi-intro .zi-panel,
   .zi-squash,
   .zi-sfx-play,
@@ -769,8 +790,4 @@
   .zi-panel:hover { transform: none; }
   .zi-panel > .zi-lock,
   .zi-abtn > .zi-lock { transition: none; transform: none; }
-}
-@media (max-width: 639px) {
-  .zi-login-grid { min-height: 0; grid-template-rows: auto; }
-  .zi-login-grid .zi-panel { min-height: 220px; }
 }
