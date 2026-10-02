@@ -532,7 +532,7 @@
   grid-template-columns: 372fr 104fr 160fr 168fr 348fr;
   grid-template-rows: 1.28fr 1fr 1fr;
   grid-template-areas: "p1 p2 p2 p3 p3" "p7 p7 p6 p6 p4" "p7 p7 p5 p5 p4";
-  height: clamp(560px, calc(100svh - 64px), 760px);
+  height: min(720px, calc(100svh - 210px));
 }
 .zi-slot-path { grid-area: p1; }
 .zi-slot-order { grid-area: p2; }
@@ -541,21 +541,36 @@
 .zi-slot-cta { grid-area: p5; }
 .zi-slot-every { grid-area: p6; }
 .zi-slot-headline { grid-area: p7; }
+.zi-login-main {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+.zi-login-stage {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+  min-height: 0;
+  padding: 16px;
+}
 .zi-login-grid {
   position: relative;
   display: grid;
+  width: min(1120px, 100%);
+  margin-inline: auto;
   grid-template-columns: 1fr 1fr 0.96fr;
-  grid-template-rows: minmax(440px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "id key go";
   gap: 16px;
-  padding: 26px 32px 32px;
-  height: clamp(440px, calc(100svh - 108px), 572px);
-  min-height: 440px;
+  padding: 8px;
+  height: min(520px, calc(100svh - 130px));
+  min-height: 0;
 }
 /* inline-size only: `size` + height:100% collapses when the row isn't definite. */
 .zi-login-grid .zi-panel {
   container-type: inline-size;
-  min-height: 440px;
+  min-height: 0;
   height: 100%;
 }
 .zi-login-id { grid-area: id; }
@@ -622,7 +637,49 @@
   50% { transform: translateY(-5px); }
 }
 .zi-hero-grid > [data-panel] {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   animation: zi-bob 5.2s ease-in-out infinite;
+}
+.zi-sfx,
+.zi-sfx svg { pointer-events: none; }
+.zi-corner-stamp {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 112px;
+  height: 80px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.zi-corner-stamp .zi-sfx-stamp {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: scale(0.15);
+  transform-origin: top right;
+}
+.zi-fx,
+.zi-burst-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+.zi-burst-layer {
+  display: grid;
+  place-items: center;
+}
+.zi-burst-xl { transform: scale(2.4); transform-origin: center; }
+.zi-click-at {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 .zi-intro > [data-panel] { animation: none; }
 .zi-slot-order { animation-duration: 5.6s; animation-delay: -0.7s; }
@@ -787,6 +844,8 @@
   .zi-enter-l,
   .zi-enter-r { animation: none; }
   .zi-sfx-play, .zi-sfx-stamp { transform: scale(0.5); }
+  .zi-corner-stamp .zi-sfx-stamp { transform: scale(0.15); transform-origin: top right; }
+  .zi-click-at .zi-sfx-play { transform: none; opacity: 1; }
   .zi-panel:hover { transform: none; }
   .zi-panel > .zi-lock,
   .zi-abtn > .zi-lock { transition: none; transform: none; }

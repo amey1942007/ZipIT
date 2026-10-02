@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 import { AnimatedRoutes } from '@/motion/AnimatedRoutes'
+import { ClickBurst } from '@/components/comic/BurstPortal'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { AppShell } from '@/components/shell/Shell'
 import { Toaster } from '@/components/ui/sonner'
@@ -67,8 +68,9 @@ export default function App() {
   return (
     <AuthProvider>
       <HashRouter>
-        <Toaster />
-        <RoutedApp />
+      <Toaster />
+      <RoutedApp />
+      <ClickBurst />
       </HashRouter>
     </AuthProvider>
   )

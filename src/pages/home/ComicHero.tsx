@@ -9,6 +9,7 @@ import { GutterPath } from '@/components/comic/GutterPath'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { Panel } from '@/components/comic/Panel'
 import { PathMeter } from '@/components/comic/PathMeter'
+import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Sfx } from '@/components/comic/Sfx'
 import { TeamStatsPanel } from '@/components/comic/TeamStatsPanel'
 import { CodePlaygroundButton } from '@/components/shell/Shell'
@@ -126,9 +127,9 @@ export function ComicHero() {
       <div ref={gridRef} className={playing ? 'zi-hero-grid zi-intro' : 'zi-hero-grid'}>
         <GutterPath d={d} progress={progress} bolt />
         {playing && t >= 2.02 ? (
-          <span className="pointer-events-none absolute top-1/2 left-1/2 z-30 -translate-x-1/2 -translate-y-1/2">
+          <StampOverlay>
             <Sfx preset="zipit" stamp={false} play holdMs={830} label="ZIP IT!" />
-          </span>
+          </StampOverlay>
         ) : null}
         <div data-panel className="zi-slot-path">
           <Panel fill="red" ghost="1" inked={lit(0)} className="h-full">
@@ -185,7 +186,7 @@ export function ComicHero() {
           </Panel>
         </div>
         <div data-panel className="zi-slot-headline">
-          <Panel fill="red" ghost="7" inked={lit(6)} className="h-full">
+          <Panel fill="red" inked={lit(6)} className="h-full">
             <div className="relative grid h-full content-center gap-3 p-4 text-ivory">
               <CaptionBox>
                 <h1 tabIndex={-1}>
@@ -207,11 +208,6 @@ export function ComicHero() {
                 {ORGANISER_LINE}
                 <span className="mt-1 block font-sans text-[13px] font-normal text-ivory-muted">{ORGANISER_SUBLINE}</span>
               </p>
-              {!playing ? (
-                <span className="absolute top-3 right-3">
-                  <Sfx preset="zipit" stamp label="ZIP IT!" />
-                </span>
-              ) : null}
             </div>
           </Panel>
         </div>

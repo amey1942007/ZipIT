@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { EVENT_DATE, ORGANISER_LINE, ORGANISER_SUBLINE, TAGLINE } from '@/config/site'
 import { BackendNotice } from '@/components/PageFrame'
 import { ActionButton } from '@/components/comic/ActionButton'
+import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Balloon } from '@/components/comic/Balloon'
 import { CaptionBox } from '@/components/comic/CaptionBox'
 import { HudReadout } from '@/components/comic/HudReadout'
@@ -147,16 +148,17 @@ export function LoginPage() {
   const pathProgress = route.stops[stop] ?? 0
 
   return (
-    <main id="main" tabIndex={-1} className={granted ? 'zi-shake min-h-svh bg-ink text-ivory outline-none' : 'min-h-svh bg-ink text-ivory outline-none'}>
+    <main id="main" tabIndex={-1} className={granted ? 'zi-login-main zi-shake bg-ink text-ivory outline-none' : 'zi-login-main bg-ink text-ivory outline-none'}>
       <h1 className="sr-only">Login</h1>
       <p className="sr-only">{EVENT_DATE}</p>
-      <header className="zi-hud flex h-[50px] items-center justify-between border-b-2 border-[rgba(255,200,61,.55)] px-4">
+      <header className="zi-hud flex h-[50px] shrink-0 items-center justify-between border-b-2 border-[rgba(255,200,61,.55)] px-4">
         <Wordmark />
         <span className="zi-tm hidden lg:inline">
           {ORGANISER_LINE} · {ORGANISER_SUBLINE}
         </span>
         <PathMeter total={3} filled={step} label="LOGIN" readout={`PANEL ${Math.max(step, 1)}/3`} />
       </header>
+      <div className="zi-login-stage">
       <form ref={formRef} noValidate className="zi-login-grid" onSubmit={onSubmit}>
         <GutterPath d={route.d} progress={pathProgress} />
         <Panel fill="ivory" className="zi-login-id">
@@ -267,18 +269,31 @@ export function LoginPage() {
           </div>
         </Panel>
       </form>
+      </div>
       {granted ? (
-        <div className="pointer-events-none fixed inset-0 grid place-items-center">
-          <CaptionBox tone="red" className="zi-stamp">
-            <p className="font-display text-5xl font-bold text-ivory" aria-hidden>
-              ACCESS GRANTED
-            </p>
-            <p className="font-mono text-sm font-bold text-gold">{username.trim().toUpperCase()} · CLEARED</p>
-          </CaptionBox>
+        <StampOverlay>
+          <div className="grid place-items-center gap-3">
+            <Sfx preset="zipit" stamp={false} play holdMs={1200} />
+            <CaptionBox tone="red" className="zi-stamp">
+              <p className="font-display text-6xl font-bold text-ivory" aria-hidden>
+                ACCESS GRANTED
+              </p>
+              <p className="font-mono text-sm font-bold text-gold">{username.trim().toUpperCase()} · CLEARED</p>
+            </CaptionBox>
+          </div>
           <p role="status" className="sr-only">
             Access granted. Opening ZipIT.
           </p>
-        </div>
+        </StampOverlay>
+      ) : null}
+      {formError ? (
+        <StampOverlay>
+          <CaptionBox tone="red" className="zi-stamp">
+            <p className="font-display text-6xl font-bold text-ivory" aria-hidden>
+              ACCESS DENIED
+            </p>
+          </CaptionBox>
+        </StampOverlay>
       ) : null}
     </main>
   )
