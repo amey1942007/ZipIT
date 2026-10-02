@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { parseSubmissionBroadcast } from '@/lib/broadcast'
 import { supabase } from '@/lib/supabase'
 
@@ -32,7 +32,9 @@ export function useSubmissionFeed(teamId: string | null, reload: () => void): vo
   }, [teamId, reload])
 }
 
-export function useBoardFeed(reload: () => void): void {
+export function useBoardFeed(reload: () => void, onStatus?: (status: string) => void): void {
+  const onStatusRef = useRef(onStatus)
+  onStatusRef.current = onStatus
   useEffect(() => {
     if (!supabase) return
     const client = supabase
@@ -45,7 +47,9 @@ export function useBoardFeed(reload: () => void): void {
       .channel('lb')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, schedule)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, schedule)
-      .subscribe()
+      .subscribe((status) => {
+        onStatusRef.current?.(status)
+      })
     return () => {
       window.clearTimeout(timer)
       void client.removeChannel(channel)

@@ -1,18 +1,22 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Eye, EyeOff, TriangleAlert } from 'lucide-react'
+import { useReducedMotion } from 'motion/react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { EVENT_DATE, ORGANISER_LINE, ORGANISER_SUBLINE, TAGLINE } from '@/config/site'
 import { BackendNotice } from '@/components/PageFrame'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { ActionButton } from '@/components/comic/ActionButton'
+import { Balloon } from '@/components/comic/Balloon'
+import { CaptionBox } from '@/components/comic/CaptionBox'
+import { HudReadout } from '@/components/comic/HudReadout'
+import { Panel } from '@/components/comic/Panel'
+import { PathMeter } from '@/components/comic/PathMeter'
 import { usePageTitle, Wordmark } from '@/components/shell/Shell'
 import { loginEmail } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
 export function LoginPage() {
   usePageTitle('Login')
+  const reduced = useReducedMotion()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [username, setUsername] = useState('')
@@ -22,6 +26,8 @@ export function LoginPage() {
   const [userError, setUserError] = useState('')
   const [passError, setPassError] = useState('')
   const [formError, setFormError] = useState('')
+  const [granted, setGranted] = useState(false)
+  const timer = useRef(0)
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -58,86 +64,148 @@ export function LoginPage() {
       return
     }
     const next = params.get('next')
-    navigate(next && next.startsWith('/') ? next : '/', { replace: true })
+    const target = next && next.startsWith('/') ? next : '/'
+    setGranted(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      navigate(target, { replace: true, state: { ziTurn: true } })
+    }, reduced ? 0 : 600)
   }
 
+  const idSet = username.trim() !== ''
+  const keySet = idSet && password !== ''
+  const step = busy || granted ? 3 : keySet ? 2 : idSet ? 1 : 0
+
   return (
-    <main id="main" tabIndex={-1} className="grid min-h-svh place-items-center bg-bg px-4 outline-none">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(224,30,55,0.18),transparent_60%)]" />
-      <div className="relative w-full max-w-[400px] rounded-xl border border-border bg-surface p-6 shadow-panel sm:p-8">
-        <h1 className="sr-only">Login</h1>
-        <p className="text-center">
-          <Wordmark className="text-h2 lg:text-h1" />
-        </p>
-        <p className="mt-2 text-center text-text-muted">{TAGLINE}</p>
-        <p className="sr-only">{EVENT_DATE}</p>
-        <BackendNotice />
-        <form noValidate className="mt-8 grid gap-4" onSubmit={onSubmit}>
-          <div className="grid gap-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={username}
-              aria-invalid={Boolean(userError)}
-              aria-describedby={userError ? 'username-error' : undefined}
-              onChange={(event) => setUsername(event.target.value)}
-              readOnly={busy}
-              className="h-11 rounded-xl border-border-strong bg-surface-2 text-base"
-            />
-            {userError ? (
-              <p id="username-error" className="flex items-center gap-2 text-danger">
-                <TriangleAlert className="size-4" /> {userError}
-              </p>
-            ) : null}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={show ? 'text' : 'password'}
-                autoComplete="current-password"
-                value={password}
-                aria-invalid={Boolean(passError)}
-                aria-describedby={passError ? 'password-error' : undefined}
-                onChange={(event) => setPassword(event.target.value)}
+    <main id="main" tabIndex={-1} className="min-h-svh bg-ink text-ivory outline-none">
+      <h1 className="sr-only">Login</h1>
+      <p className="sr-only">{EVENT_DATE}</p>
+      <header className="zi-hud flex h-[50px] items-center justify-between border-b-2 border-[rgba(255,200,61,.55)] px-4">
+        <Wordmark />
+        <span className="zi-tm hidden lg:inline">
+          {ORGANISER_LINE} · {ORGANISER_SUBLINE}
+        </span>
+        <PathMeter total={3} filled={step} label="LOGIN" readout={`PANEL ${Math.max(step, 1)}/3`} />
+      </header>
+      <form noValidate className="zi-login-grid" onSubmit={onSubmit}>
+        <Panel fill="ivory" className="zi-login-id">
+          <div className="grid h-full content-start gap-4 p-6 text-ink">
+            <HudReadout>IDENTIFY · PANEL 1/3</HudReadout>
+            <p className="font-display text-[clamp(40px,9cqh,64px)] leading-none font-bold -skew-x-8">
+              WHO&apos;S
+              <br />
+              PLAYING?
+            </p>
+            <p className="bg-ivory px-2 py-1 text-[15px]">{TAGLINE}</p>
+            <Balloon>
+              <label htmlFor="username" className="font-display text-[13px] font-semibold tracking-[0.12em] text-comic-red uppercase">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={username}
+                aria-invalid={Boolean(userError)}
+                aria-describedby={userError ? 'username-error' : undefined}
+                onChange={(event) => setUsername(event.target.value)}
                 readOnly={busy}
-                className="h-11 rounded-xl border-border-strong bg-surface-2 pr-12 text-base"
+                className="mt-2 h-12 w-full border-0 border-b-[3px] border-ink bg-transparent font-mono text-2xl font-bold text-ink caret-comic-red outline-none"
               />
-              <button
-                type="button"
-                className="absolute top-0 right-0 grid size-11 place-items-center text-text-muted"
-                aria-label={show ? 'Hide password' : 'Show password'}
-                aria-pressed={show}
-                onClick={() => setShow((value) => !value)}
-              >
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {passError ? (
-              <p id="password-error" className="flex items-center gap-2 text-danger">
-                <TriangleAlert className="size-4" /> {passError}
-              </p>
-            ) : null}
+              {userError ? (
+                <p id="username-error" className="mt-2 flex items-center gap-2 bg-comic-red px-2 py-1 text-sm font-semibold text-ivory">
+                  <TriangleAlert className="size-4" /> {userError}
+                </p>
+              ) : null}
+            </Balloon>
+            <HudReadout className="justify-self-end">{idSet ? 'ID SET' : 'AWAITING ID'}</HudReadout>
           </div>
-          {formError ? (
-            <Alert variant="destructive">
-              <TriangleAlert />
-              <AlertTitle>Sign in failed</AlertTitle>
-              <AlertDescription>{formError}</AlertDescription>
-            </Alert>
-          ) : null}
-          <Button type="submit" className="h-11 w-full rounded-full font-semibold text-white" aria-busy={busy} disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </Button>
-        </form>
-        <div className="my-6 h-px bg-border" />
-        <p className="text-center font-display text-xs font-semibold tracking-[0.12em] text-gold">{ORGANISER_LINE}</p>
-        <p className="text-center text-xs text-text-muted">{ORGANISER_SUBLINE}</p>
-      </div>
+        </Panel>
+        <Panel fill="maroon" className="zi-login-key">
+          <div className="grid h-full content-start gap-4 p-6">
+            <HudReadout>VERIFY · PANEL 2/3</HudReadout>
+            <p className="font-display text-[clamp(40px,9cqh,64px)] leading-none font-bold text-ivory -skew-x-8">
+              PROVE
+              <br />
+              <span className="text-gold">IT.</span>
+            </p>
+            <Balloon>
+              <label htmlFor="password" className="font-display text-[13px] font-semibold tracking-[0.12em] text-comic-red uppercase">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={show ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  aria-invalid={Boolean(passError)}
+                  aria-describedby={passError ? 'password-error' : undefined}
+                  onChange={(event) => setPassword(event.target.value)}
+                  readOnly={busy}
+                  className="mt-2 h-12 w-full border-0 border-b-[3px] border-ink bg-transparent pr-12 font-mono text-2xl font-bold text-ink caret-comic-red outline-none"
+                />
+                <button
+                  type="button"
+                  className="absolute top-2 right-0 grid size-11 place-items-center text-ink"
+                  aria-label={show ? 'Hide password' : 'Show password'}
+                  aria-pressed={show}
+                  onClick={() => setShow((value) => !value)}
+                >
+                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {passError ? (
+                <p id="password-error" className="mt-2 flex items-center gap-2 bg-comic-red px-2 py-1 text-sm font-semibold text-ivory">
+                  <TriangleAlert className="size-4" /> {passError}
+                </p>
+              ) : null}
+            </Balloon>
+            <HudReadout className="justify-self-end">{keySet ? 'KEY SET' : 'AWAITING KEY'}</HudReadout>
+          </div>
+        </Panel>
+        <Panel fill="red" className="zi-login-go">
+          <div className="grid h-full content-start gap-4 p-6">
+            <HudReadout>ENGAGE · PANEL 3/3</HudReadout>
+            <p className="comic-word text-6xl text-ivory">GO.</p>
+            <BackendNotice />
+            <ActionButton type="submit" size="hero" className="w-full" aria-busy={busy} disabled={busy}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </ActionButton>
+            {formError ? (
+              <div role="alert">
+                <CaptionBox tone="red">
+                  <p className="font-display text-[40px] font-bold text-ivory" aria-hidden>
+                    DENIED
+                  </p>
+                  <p className="font-display text-xs font-semibold tracking-[0.12em] text-ivory uppercase">Sign in failed</p>
+                  <p className="text-[15px] font-medium text-ivory">{formError}</p>
+                </CaptionBox>
+              </div>
+            ) : null}
+            <p className="font-display text-xs font-semibold text-ivory">{ORGANISER_LINE}</p>
+            <HudReadout className="justify-self-end">
+              {granted ? 'CLEARED' : formError ? 'DENIED' : busy ? 'CHECKING…' : 'STANDBY'}
+            </HudReadout>
+          </div>
+        </Panel>
+      </form>
+      {granted ? (
+        <div className="pointer-events-none fixed inset-0 grid place-items-center">
+          <CaptionBox tone="red" className="-rotate-1">
+            <p className="font-display text-5xl font-bold text-ivory" aria-hidden>
+              ACCESS GRANTED
+            </p>
+            <p className="font-mono text-sm font-bold text-gold">{username.trim().toUpperCase()} · CLEARED</p>
+          </CaptionBox>
+          <p role="status" className="sr-only">
+            Access granted. Opening ZipIT.
+          </p>
+        </div>
+      ) : null}
     </main>
   )
 }

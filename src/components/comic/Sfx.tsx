@@ -7,6 +7,7 @@ const PRESETS = {
   click: { text: 'CLICK!', sub: '', seed: 11, desktop: [44, 54], tablet: [44, 54], mobile: [36, 44] },
   go: { text: 'GO!', sub: '', seed: 17, desktop: [40, 50], tablet: [40, 50], mobile: [32, 40] },
   new1: { text: 'NEW #1!', sub: '', seed: 29, desktop: [44, 54], tablet: [40, 50], mobile: [32, 40] },
+  newbest: { text: 'NEW BEST!', sub: '', seed: 31, desktop: [40, 50], tablet: [34, 42], mobile: [28, 36] },
 } as const
 
 export type SfxPreset = keyof typeof PRESETS

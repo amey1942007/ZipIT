@@ -132,6 +132,25 @@ export async function fetchTeams(): Promise<Tables<'teams'>[]> {
   return data ?? []
 }
 
+type CountRpc = {
+  rpc: (fn: 'my_submission_count') => PromiseLike<{ data: unknown; error: { message: string } | null }>
+}
+
+/** Lifetime submission count. Call only after sign-in. Null when the RPC errors. */
+export async function fetchMySubmissionCount(): Promise<number | null> {
+  if (!supabase) return null
+  const { data, error } = await (supabase as unknown as CountRpc).rpc('my_submission_count')
+  const total = error ? null : Number(data ?? 0)
+  return total == null || Number.isNaN(total) ? null : total
+}
+
+export async function fetchPendingRuns(teamId: string): Promise<number> {
+  if (!supabase) return 0
+  const { data, error } = await supabase.from('submissions').select('status').eq('team_id', teamId)
+  if (error || !data) return 0
+  return data.filter((row) => row.status === 'queued' || row.status === 'running').length
+}
+
 export async function fetchAudit(): Promise<AuditRow[]> {
   if (!supabase) return []
   const { data, error } = await supabase.from('admin_audit').select('*').order('at', { ascending: false }).limit(200)
