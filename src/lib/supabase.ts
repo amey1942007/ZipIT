@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/database.types'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -9,7 +10,8 @@ export const isSupabaseConfigured = Boolean(url && key)
 /**
  * Browser client. Null when the site was built without the public Supabase
  * URL or publishable key, so the app can render a notice instead of throwing.
- * This module never reads a service-role or secret key.
+ * Both values are read from env only. This module never reads a service-role
+ * or secret key.
  */
-export const supabase: SupabaseClient | null =
-  url && key ? createClient(url, key) : null
+export const supabase: SupabaseClient<Database> | null =
+  url && key ? createClient<Database>(url, key) : null

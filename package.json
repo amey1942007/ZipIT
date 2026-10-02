@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/fetch-pyodide.mjs",
     "build": "tsc -b && vite build",
+    "postinstall": "node scripts/fetch-pyodide.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "oxlint",
     "test": "vitest",
@@ -38,6 +40,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^30.1.1",
     "oxlint": "^1.86.0",
+    "pyodide": "314.0.7",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "vite": "^8.3.2",
