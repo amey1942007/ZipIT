@@ -186,7 +186,7 @@ export function AdminPage() {
                   <td className="px-3 py-2">{row.file_name}</td>
                   <td className="px-3 py-2">{row.status}</td>
                   <td className="px-3 py-2">{formatScore(row.score)}</td>
-                  <td className="px-3 py-2">{formatIst(row.created_at, true)}</td>
+                  <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatIst(row.created_at, true)}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -211,7 +211,7 @@ export function AdminPage() {
             </tbody>
           </table>
           {code ? (
-            <pre className="mt-4 max-h-80 overflow-auto rounded-xl bg-bg p-4 font-mono text-sm whitespace-pre-wrap">{code}</pre>
+            <pre className="mt-4 max-h-80 overflow-auto rounded-xl bg-bg p-4 font-mono text-sm font-normal whitespace-pre-wrap">{code}</pre>
           ) : null}
         </section>
       ) : null}
@@ -302,7 +302,7 @@ export function AdminPage() {
             <tbody>
               {audit.map((row) => (
                 <tr key={row.id} className="border-t border-border">
-                  <td className="px-3 py-2">{formatIst(row.at, true)}</td>
+                  <td className="px-3 py-2 font-mono font-bold tabular-nums">{formatIst(row.at, true)}</td>
                   <td className="px-3 py-2">{row.action}</td>
                   <td className="px-3 py-2">{row.actor_kind}</td>
                   <td className="px-3 py-2 font-mono text-xs">{JSON.stringify(row.details)}</td>

@@ -14,7 +14,7 @@
 
   /* ---------- Colour: base ---------- */
   --zi-bg:               #1C0509;  /* page background */
-  --zi-surface:          #2B0A10;  /* cards, tables, panels, grid cells */
+  --zi-surface:          #2B0A10;  /* cards, tables, panels, Arena board card */
   --zi-surface-2:        #3D0E17;  /* hover, inputs, own-team row */
   --zi-border:           #5A1520;  /* decorative hairlines only (1.45:1) */
   --zi-border-strong:    #B0606C;  /* input / control boundaries (3.72:1 on surface-2) */
@@ -46,40 +46,54 @@
   --zi-scrim:            rgba(28, 5, 9, 0.80);        /* dialog overlay */
   --zi-flash-rise:       rgba(124, 255, 178, 0.18);   /* leaderboard rise flash */
   --zi-flash-fall:       rgba(255, 179, 184, 0.14);   /* leaderboard fall flash */
-  --zi-flash-invalid:    rgba(255, 179, 184, 0.55);   /* Arena invalid-pick cell flash */
+  --zi-flash-invalid:    rgba(200, 16, 46, 0.35);   /* Arena invalid-pick cell flash */
 
-  /* ---------- Colour: Arena board ---------- */
-  --zi-cell:             #2B0A10;                     /* = surface */
-  --zi-cell-line:        #5A1520;                     /* 1px grid lines */
-  --zi-cell-visited:     rgba(255, 200, 61, 0.14);    /* cell on current path (≈ #492516) */
-  --zi-cell-backtracked: rgba(255, 179, 184, 0.12);   /* hatch colour for popped cells */
-  --zi-path:             #FFC83D;                     /* path stroke (11.77:1 vs cell) */
-  --zi-wall:             #FFF6E8;                     /* walls (16.99:1 vs cell) */
-  --zi-waypoint-fill:    #FFC83D;
-  --zi-waypoint-text:    #1C0509;
-  --zi-head-fill:        #FFFFFF;
-  --zi-head-ring:        #E01E37;                     /* 3.08:1 vs gold path */
+  /* ---------- Colour: Arena board: B3 "Ivory Blueprint" (approved 3 Oct 2026) ----------
+     Ratios are WCAG 2.x against the cell #FFF6E8 unless noted. */
+  --zi-board-surface:     #2B0A10;                   /* board card behind the cells (= surface) */
+  --zi-board-frame:       #FFC83D;                   /* 2px board card border (12.63:1 vs page bg) */
+  --zi-cell:              #FFF6E8;                   /* cell fill (18.23:1 vs page bg) */
+  --zi-grid-line:         #9C8675;                   /* 1px grid lines (3.22:1) */
+  --zi-wall:              #1C0509;                   /* walls (18.23:1; 15.60:1 on a visited cell) */
+  --zi-wp-fill:           #1C0509;                   /* unreached waypoint fill */
+  --zi-wp-stroke:         #1C0509;                   /* unreached waypoint 2px stroke (18.23:1) */
+  --zi-wp-num:            #FFF6E8;                   /* unreached waypoint number (18.23:1 on wp fill) */
+  --zi-wp-reached-fill:   #FFC83D;                   /* reached waypoint fill */
+  --zi-wp-reached-stroke: #1C0509;                   /* reached waypoint 2px stroke (18.23:1 vs cell) */
+  --zi-wp-reached-num:    #1C0509;                   /* reached waypoint number (12.63:1 on gold) */
+  --zi-cell-visited:      rgba(224, 30, 55, 0.10);   /* visited-cell tint (≈ #FCE0D6 on the cell) */
+  --zi-path:              #C8102E;                   /* path stroke (5.49:1; 4.70:1 on a visited cell) */
+  --zi-head-fill:         #FFC83D;                   /* head marker fill */
+  --zi-head-ring:         #1C0509;                   /* head 3px ring (3.32:1 vs path, 12.63:1 vs head fill) */
+  --zi-head-halo:         rgba(224, 30, 55, 0.30);   /* halo circle behind the head */
+  --zi-next-wp-ring:      #C8102E;                   /* dashed next-waypoint ring (5.49:1) */
+  --zi-backtrack-hatch:   #9C8675;                   /* 1px 45° hatch on popped cells, full opacity (3.22:1) */
 
   /* ---------- Hazard stripe (frozen) ---------- */
   --zi-hazard: repeating-linear-gradient(45deg, #FFC83D 0 12px, #1C0509 12px 24px);
 
   /* ---------- Typography ---------- */
-  --zi-font-display: "Orbitron", "Exo 2", system-ui, sans-serif;   /* 700/900, only at >= 21px */
-  --zi-font-body:    "Exo 2", system-ui, -apple-system, "Segoe UI", sans-serif; /* 400/500/600 */
-  --zi-font-mono:    "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; /* 700 numbers, 400 code */
+  /* Fonts: A2 "HUD Telemetry" (approved 3 Oct 2026). The app self-hosts these via
+     @fontsource/chakra-petch (600, 700), @fontsource/inter (400, 500, 600) and
+     @fontsource/jetbrains-mono (400, 700), because the CSP has font-src 'self'.
+     Static mocks only, Google Fonts:
+     https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap */
+  --zi-font-display: "Chakra Petch", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; /* 700 hero/h1/h2/wordmark/hero CTA; 600 h3/h4 + 12px uppercase labels */
+  --zi-font-body:    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; /* 400 body, 500 tagline/emphasis, 600 buttons/nav/UI */
+  --zi-font-mono:    "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace; /* 700 numbers, 400 code */
 
   /* Type scale: base 16px, ratio 1.333 */
   --zi-text-caption: 0.75rem;    /* 12px */
   --zi-text-body:    1rem;       /* 16px */
-  --zi-text-h4:      1.333rem;   /* 21px  (smallest Orbitron size) */
+  --zi-text-h4:      1.333rem;   /* 21px  (smallest Chakra Petch heading size) */
   --zi-text-h3:      1.777rem;   /* 28px */
   --zi-text-h2:      2.369rem;   /* 38px */
   --zi-text-h1:      3.157rem;   /* 50px */
   --zi-text-hero:    4.209rem;   /* 67px */
   --zi-leading-body:    1.5;
   --zi-leading-heading: 1.15;
-  --zi-tracking-heading: 0.02em;
-  --zi-tracking-label:   0.12em;  /* 12px uppercase labels (Exo 2 600) */
+  --zi-tracking-heading: 0.01em;
+  --zi-tracking-label:   0.12em;  /* 12px uppercase labels (Chakra Petch 600) */
 
   /* ---------- Spacing: 8px base (4px allowed inside controls) ---------- */
   --zi-space-half: 4px;
@@ -207,10 +221,24 @@
   --color-danger:          var(--zi-danger);
   --color-warning:         var(--zi-warning);
   --color-on-status:       var(--zi-on-status);
+  --color-board-surface:   var(--zi-board-surface);
+  --color-board-frame:     var(--zi-board-frame);
   --color-cell:            var(--zi-cell);
-  --color-cell-line:       var(--zi-cell-line);
-  --color-path:            var(--zi-path);
+  --color-grid-line:       var(--zi-grid-line);
   --color-wall:            var(--zi-wall);
+  --color-wp-fill:         var(--zi-wp-fill);
+  --color-wp-stroke:       var(--zi-wp-stroke);
+  --color-wp-num:          var(--zi-wp-num);
+  --color-wp-reached-fill: var(--zi-wp-reached-fill);
+  --color-wp-reached-stroke: var(--zi-wp-reached-stroke);
+  --color-wp-reached-num:  var(--zi-wp-reached-num);
+  --color-cell-visited:    var(--zi-cell-visited);
+  --color-path:            var(--zi-path);
+  --color-head-fill:       var(--zi-head-fill);
+  --color-head-ring:       var(--zi-head-ring);
+  --color-head-halo:       var(--zi-head-halo);
+  --color-next-wp-ring:    var(--zi-next-wp-ring);
+  --color-backtrack-hatch: var(--zi-backtrack-hatch);
 
   /* shadcn semantic colours */
   --color-background:           var(--background);

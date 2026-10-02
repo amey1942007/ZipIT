@@ -102,7 +102,7 @@ export function SubmissionsPage() {
                 <p className="truncate font-semibold">{slot.submission.file_name}</p>
                 <p className="text-text-muted">{slot.scoring ? 'Scoring…' : slot.submission.status}</p>
                 <p className="zi-score text-h4">{formatScore(slot.submission.score)}</p>
-                <p className="text-sm text-text-muted">{formatIst(slot.submission.created_at, true)}</p>
+                <p className="font-mono text-sm font-bold text-text-muted tabular-nums">{formatIst(slot.submission.created_at, true)}</p>
                 {slot.submission.error ? <p className="text-danger">{slot.submission.error}</p> : null}
                 {slot.also ? <p className="text-sm text-gold">Also {slot.also}</p> : null}
                 {slot.linkable ? (

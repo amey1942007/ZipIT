@@ -60,8 +60,8 @@ export function LeaderboardPage() {
                 const photo = avatarUrl(row.avatar_path, row.best_scored_at)
                 return (
                   <tr key={row.team_id} className={mine ? 'bg-surface-2' : 'bg-surface'}>
-                    <td className="px-4 py-3 font-mono">{index + 1}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 font-mono font-bold tabular-nums">{index + 1}</td>
+                    <td className="px-4 py-3 font-semibold">
                       <span className="inline-flex items-center gap-2">
                         {photo ? (
                           <img src={photo} alt="" width={32} height={32} className="size-8 rounded-full object-cover" />
@@ -72,7 +72,7 @@ export function LeaderboardPage() {
                       </span>
                     </td>
                     <td className="zi-score px-4 py-3">{formatScore(row.best_score)}</td>
-                    <td className="px-4 py-3 text-text-muted">{formatIst(row.best_scored_at, true)}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-text-muted tabular-nums">{formatIst(row.best_scored_at, true)}</td>
                   </tr>
                 )
               })
