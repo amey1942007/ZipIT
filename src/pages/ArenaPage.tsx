@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { frameAt } from '@/arena/playback'
 import { REPLAY_SCORE_LABEL, replayScore } from '@/arena/scoreLocal'
 import type { ReplayPuzzle, ReplayStep } from '@/arena/replayContract'
 import { DEFAULT_GRID, GRID_SIZES, SPEEDS, SPEED_STEPS_PER_S } from '@/config/site'
+import { useCellSize } from '@/components/arena/useCellSize'
 import { ZipBoard } from '@/components/arena/ZipBoard'
 import { PageFrame } from '@/components/PageFrame'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,10 @@ export function ArenaPage() {
   const [grid, setGrid] = useState<number>(DEFAULT_GRID)
   const [note, setNote] = useState('')
   const [noRuns, setNoRuns] = useState(false)
+  const [missing, setMissing] = useState(false)
+  const rowRef = useRef<HTMLDivElement>(null)
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const cell = useCellSize(puzzle?.cols ?? DEFAULT_GRID, rowRef, controlsRef)
 
   useEffect(() => {
     let stop = false
@@ -60,10 +65,11 @@ export function ArenaPage() {
           setSteps(loaded.steps)
           setMode('demo')
           setPlaying(true)
+          setMissing(false)
         }
       })
       .catch(() => {
-        if (!stop) setNote('Could not load the demo Zip.')
+        if (!stop && !submissionId) setNote('Could not load the demo Zip.')
       })
     return () => {
       stop = true
@@ -75,20 +81,24 @@ export function ArenaPage() {
     let stop = false
     setPlaying(false)
     setMode('run')
+    setMissing(false)
+    setPuzzle(null)
     void fetchReplay(submissionId).then((row) => {
       if (stop) return
       const nextPuzzle = asPuzzle(row?.puzzle)
       const nextSteps = asSteps(row?.steps)
-      if (!nextPuzzle) {
-        setNote('This run has no replay yet.')
+      if (!row || !nextPuzzle) {
         setPuzzle(null)
         setSteps([])
+        setMissing(true)
+        setNote('')
         return
       }
       setPuzzle(nextPuzzle)
       setSteps(nextSteps)
       setIndex(0)
       setPlaying(nextSteps.length > 0)
+      setMissing(false)
       setNote('')
     })
     return () => {
@@ -135,6 +145,7 @@ export function ArenaPage() {
     setIndex(0)
     setPlaying(true)
     setNote('')
+    setMissing(false)
     navigate('/arena')
   }
 
@@ -151,6 +162,7 @@ export function ArenaPage() {
       setSteps([])
       setIndex(0)
       setPlaying(false)
+      setMissing(false)
       setNote('This Zip has no solution loaded. Playback stays off.')
       navigate('/arena')
     } catch (error) {
@@ -160,7 +172,7 @@ export function ArenaPage() {
 
   const playbackOff = mode === 'fresh' || steps.length === 0
   const depth = frame?.maxDepth ?? 0
-  const score = puzzle ? replayScore(depth, puzzle.rows, puzzle.cols) : 0
+  const score = mode === 'fresh' || !puzzle ? null : replayScore(depth, puzzle.rows, puzzle.cols)
 
   return (
     <PageFrame title="Arena">
@@ -172,15 +184,29 @@ export function ArenaPage() {
         {mode === 'demo' ? <span className="rounded-full bg-gold px-3 py-1 text-sm font-semibold text-on-gold">Demo solution</span> : null}
       </div>
       {note ? <p className="text-text-muted">{note}</p> : null}
-      <div className="grid items-start gap-6 lg:grid-cols-[auto_1fr]">
-        {puzzle && frame ? (
-          <ZipBoard puzzle={puzzle} path={frame.path} backtracked={frame.backtracked} head={frame.head} />
+      <div ref={rowRef} className="grid w-full min-w-0 items-start gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+        {missing ? (
+          <p className="text-text-muted">
+            Run not found.{' '}
+            <Link to="/arena" className="font-semibold text-gold">
+              Back to the Arena demo
+            </Link>
+          </p>
+        ) : puzzle && frame ? (
+          <ZipBoard
+            puzzle={puzzle}
+            path={mode === 'fresh' ? [] : frame.path}
+            backtracked={mode === 'fresh' ? [] : frame.backtracked}
+            head={frame.head}
+            cell={cell}
+            showLine={mode !== 'fresh'}
+          />
         ) : (
           <p className="text-text-muted">Loading the board…</p>
         )}
-        <div className="grid max-w-md gap-4">
+        <div ref={controlsRef} className="grid min-w-0 max-w-md gap-4">
           <p className="font-mono text-text-muted">
-            {REPLAY_SCORE_LABEL}: {score}
+            {REPLAY_SCORE_LABEL}: {score == null ? '—' : score}
           </p>
           {mode === 'demo' ? <p className="text-sm text-text-muted">Official score is hidden on the demo.</p> : null}
           <div className="flex flex-wrap gap-2">

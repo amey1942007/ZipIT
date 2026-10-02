@@ -50,10 +50,14 @@ export function loginEmail(username: string): string {
 }
 
 export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
+  const withoutTags = name.trim().replace(/^(?:\[[^\]]*\]\s*)+/, '')
+  const parts = withoutTags
+    .split(/\s+/)
+    .map((part) => part.replace(/[^0-9A-Za-z]/g, ''))
+    .filter(Boolean)
   if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
-  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
+  if (parts.length === 1) return parts[0]![0]!.toUpperCase()
+  return `${parts[0]![0]!}${parts[1]![0]!}`.toUpperCase()
 }
 
 export function friendlyDbError(error: { code?: string; message?: string } | null): string | null {

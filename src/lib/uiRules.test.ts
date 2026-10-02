@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AVATAR_CONVERT_ERROR, AVATAR_TYPE_ERROR, encodeAvatar, isWebpRiff } from '@/lib/avatarEncode'
 import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broadcast'
-import { friendlyDbError, loginEmail } from '@/lib/format'
+import { friendlyDbError, initials, loginEmail } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
 import { buildSlots } from '@/lib/slots'
 import { firstUploadError } from '@/lib/uploadChecks'
@@ -24,6 +24,13 @@ describe('upload checks', () => {
 describe('login email', () => {
   it('maps a username to the zipit.local mailbox', () => {
     expect(loginEmail('  Tony ')).toBe('tony@zipit.local')
+  })
+})
+
+describe('initials', () => {
+  it('drops a leading bracket tag and punctuation', () => {
+    expect(initials('[DEMO] Ignition')).toBe('I')
+    expect(initials('[DEMO] Red Team')).toBe('RT')
   })
 })
 
