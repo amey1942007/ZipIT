@@ -61,7 +61,13 @@ export default defineConfig(({ mode }) => {
       },
     },
     worker: { format: 'es' },
-    build: { target: 'es2022', sourcemap: true },
+    build: {
+      target: 'es2022',
+      sourcemap: true,
+      assetsInlineLimit(filePath) {
+        if (/\.(?:woff2?|ttf|otf)$/i.test(filePath)) return false
+      },
+    },
     server: { port: 5173 },
     preview: { port: 4173 },
     test: {

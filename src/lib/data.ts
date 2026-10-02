@@ -125,18 +125,6 @@ export async function fetchReplay(submissionId: string): Promise<ReplayRow | nul
   return data
 }
 
-export async function saveReplay(row: {
-  submission_id: string
-  team_id: string
-  puzzle: ReplayRow['puzzle']
-  steps: ReplayRow['steps']
-  summary: ReplayRow['summary']
-}): Promise<void> {
-  if (!supabase) throw new Error('backend')
-  const { error } = await supabase.from('replays').upsert(row, { onConflict: 'submission_id' })
-  if (error) throw error
-}
-
 export async function fetchTeams(): Promise<Tables<'teams'>[]> {
   if (!supabase) return []
   const { data, error } = await supabase.from('teams').select('*').order('team_name')
