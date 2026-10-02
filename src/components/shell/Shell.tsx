@@ -10,8 +10,6 @@ import {
   Shield,
   User,
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { Sfx } from '@/components/comic/Sfx'
 import { CODE_PLAYGROUND_URL, ORGANISER_LINE, ORGANISER_SUBLINE } from '@/config/site'
 import {
   DropdownMenu,
@@ -59,44 +57,21 @@ export function CodePlaygroundButton({
   className?: string
 }) {
   const label = compact ? 'Playground' : 'Code Playground'
-  const [tick, setTick] = useState(0)
   const classes = cn('zi-abtn zi-abtn-primary relative', hero ? 'zi-abtn-hero' : 'zi-abtn', className)
+  const href = CODE_PLAYGROUND_URL || 'about:blank'
   const pop = (event: { currentTarget: HTMLElement }) => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const el = event.currentTarget
     el.classList.remove('zi-squash')
     void el.offsetWidth
     el.classList.add('zi-squash')
-    setTick((n) => n + 1)
-  }
-  const burst = tick ? (
-    <span key={tick} className="zi-click-pop">
-      <Sfx preset="click" stamp={false} play holdMs={570} />
-    </span>
-  ) : null
-  if (CODE_PLAYGROUND_URL) {
-    return (
-      <a className={classes} href={CODE_PLAYGROUND_URL} target="_blank" rel="noopener noreferrer" onClick={pop}>
-        {label}
-        <ExternalLink aria-hidden className="size-4" />
-        <span className="sr-only">(opens in a new tab)</span>
-        {burst}
-      </a>
-    )
   }
   return (
-    <button
-      type="button"
-      className={classes}
-      onClick={(event) => {
-        pop(event)
-        toast.info("The Code Playground link isn't live yet.", { duration: 4000 })
-      }}
-    >
+    <a className={classes} href={href} target="_blank" rel="noopener noreferrer" onClick={pop}>
       {label}
       <ExternalLink aria-hidden className="size-4" />
-      {burst}
-    </button>
+      <span className="sr-only">(opens in a new tab)</span>
+    </a>
   )
 }
 
@@ -223,10 +198,11 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
                       <User /> Profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => toast.info("The Code Playground link isn't live yet.", { duration: 4000 })}
-                    >
-                      <ExternalLink /> Code Playground
+                    <DropdownMenuItem asChild>
+                      <a href={CODE_PLAYGROUND_URL || 'about:blank'} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink /> Code Playground
+                        <span className="sr-only">(opens in a new tab)</span>
+                      </a>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

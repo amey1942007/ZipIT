@@ -6,12 +6,14 @@ import { CaptionBox } from '@/components/comic/CaptionBox'
 import { CheckChip } from '@/components/comic/CheckChip'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { Panel } from '@/components/comic/Panel'
+import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Sfx } from '@/components/comic/Sfx'
 import { useAuth } from '@/lib/auth'
 import { fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
 import { formatIst, formatScore } from '@/lib/format'
 import { buildSlots } from '@/lib/slots'
 import { uploadCheckList } from '@/lib/uploadChecks'
+import { isSupabaseConfigured } from '@/lib/supabase'
 import { useSubmissionFeed } from '@/lib/useLive'
 
 export function SubmissionsPage() {
@@ -38,7 +40,7 @@ export function SubmissionsPage() {
   useSubmissionFeed(team?.id ?? null, reload)
 
   async function take(list: File[]) {
-    if (!team) return
+    if (!team && isSupabaseConfigured) return
     const file = list[0]
     const report = uploadCheckList({
       names: list.map((item) => item.name),
@@ -57,6 +59,12 @@ export function SubmissionsPage() {
     setOutcome(null)
     setMessage('')
     void file.text().then((text) => setPreview(text.split('\n').slice(0, 10).map((line) => line.slice(0, 90)))).catch(() => setPreview([]))
+    if (!isSupabaseConfigured || !team) {
+      setOutcome('ok')
+      setMessage('Preview only. Nothing was uploaded.')
+      setBusy(false)
+      return
+    }
     try {
       await uploadSubmission(team.id, file)
       setOutcome('ok')
@@ -95,7 +103,7 @@ export function SubmissionsPage() {
                 className="sr-only"
                 type="file"
                 accept=".py,text/x-python"
-                disabled={busy || !team}
+                disabled={busy || (!team && isSupabaseConfigured)}
                 onChange={(event) => {
                   void take(Array.from(event.target.files ?? []))
                   event.target.value = ''
@@ -145,26 +153,38 @@ export function SubmissionsPage() {
             </div>
             {outcome === 'ok' ? (
               <>
-                <span className="pointer-events-none absolute top-16 left-1/2 z-10 -translate-x-1/2">
-                  <Sfx preset="zipped" stamp={false} play holdMs={1600} label="ZIPPED!" />
-                </span>
+                <StampOverlay>
+                  <div className="grid place-items-center">
+                    <Sfx preset="zipped" stamp={false} play holdMs={1600} label="ZIPPED!" />
+                  </div>
+                </StampOverlay>
                 <CaptionBox className="zi-stamp">
                   <p className="font-display text-2xl font-bold">
-                    ZIPPED! · <span className="text-comic-red">queued for Arena</span>
+                    ZIPPED! ·{' '}
+                    <span className="text-comic-red">{isSupabaseConfigured ? 'queued for Arena' : 'preview'}</span>
                   </p>
                   <p>{message}</p>
                 </CaptionBox>
               </>
             ) : null}
             {outcome === 'error' ? (
-              <div role="alert">
-                <CaptionBox tone="red" className="zi-stamp">
-                  <p className="font-display text-[32px] font-bold text-ivory" aria-hidden>
-                    REJECTED
-                  </p>
-                  <p className="text-ivory">{message}</p>
-                </CaptionBox>
-              </div>
+              <>
+                <StampOverlay>
+                  <CaptionBox tone="red" className="zi-stamp">
+                    <p className="font-display text-6xl font-bold text-ivory" aria-hidden>
+                      REJECTED
+                    </p>
+                  </CaptionBox>
+                </StampOverlay>
+                <div role="alert">
+                  <CaptionBox tone="red" className="zi-stamp">
+                    <p className="font-display text-[32px] font-bold text-ivory" aria-hidden>
+                      REJECTED
+                    </p>
+                    <p className="text-ivory">{message}</p>
+                  </CaptionBox>
+                </div>
+              </>
             ) : null}
             {message && outcome === 'ok' ? <p className="sr-only">Zipped. {message}</p> : null}
           </div>

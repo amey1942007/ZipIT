@@ -1,6 +1,6 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import { ImpactLines } from '@/components/comic/ImpactLines'
+import { StampOverlay } from '@/components/comic/BurstPortal'
 import { LockOn } from '@/components/comic/LockOn'
 import { Sfx } from '@/components/comic/Sfx'
 import { cn } from '@/lib/utils'
@@ -48,13 +48,12 @@ export function ActionButton({
   const [tick, setTick] = useState(0)
   const classes = cn('zi-abtn relative', VARIANT[variant], size === 'hero' && 'zi-abtn-hero', className)
   const burst =
-    tick > 0 ? (
-      <span key={tick} className="zi-click-pop">
-        <span className="zi-impact">
-          <ImpactLines compact />
+    sfx === 'go' && tick > 0 ? (
+      <StampOverlay>
+        <span key={tick} className="zi-burst-xl">
+          <Sfx preset="go" stamp={false} play holdMs={700} label="GO!" />
         </span>
-        <Sfx preset={sfx} stamp={false} play holdMs={sfx === 'go' ? 340 : 570} />
-      </span>
+      </StampOverlay>
     ) : null
   if (to) {
     return (

@@ -37,7 +37,7 @@ export function Sfx({
   const size = pad * 2
   return (
     <span
-      className={stamp ? 'zi-sfx-stamp inline-block' : motion ? 'zi-sfx-play inline-block' : 'inline-block'}
+      className={stamp ? 'zi-sfx zi-sfx-stamp inline-block' : motion ? 'zi-sfx zi-sfx-play inline-block' : 'zi-sfx inline-block'}
       style={motion ? ({ '--zi-sfx-hold': `${holdMs}ms` } as CSSProperties) : undefined}
     >
       <svg

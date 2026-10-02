@@ -49,7 +49,7 @@ export function GutterPath({
     )
   }
   return (
-    <svg className="zi-zip pointer-events-none absolute inset-0 z-[1] h-full w-full overflow-visible" aria-hidden>
+    <svg className="zi-zip pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible" aria-hidden>
       <path d={d} {...shared} className="zi-zip-glow" stroke="#FFC83D" strokeWidth="18" />
       <path
         d={jagged(d)}
