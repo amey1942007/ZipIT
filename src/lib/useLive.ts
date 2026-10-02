@@ -8,7 +8,7 @@ export function useSubmissionFeed(teamId: string | null, reload: () => void): vo
     if (!supabase || !teamId) return
     const client = supabase
     let stopped = false
-    const channel = client.channel(`team:${teamId}`, { config: { private: true } })
+    const channel = client.channel(`team:${teamId}:${Math.random().toString(36).slice(2)}`, { config: { private: true } })
     void client.realtime.setAuth().then(() => {
       if (stopped) return
       channel
@@ -43,8 +43,10 @@ export function useBoardFeed(reload: () => void, onStatus?: (status: string) => 
       window.clearTimeout(timer)
       timer = window.setTimeout(reload, 300)
     }
+    // A page turn mounts the outgoing page and the next one together. One shared
+    // channel name throws once the first instance has subscribed.
     const channel = client
-      .channel('lb')
+      .channel(`lb:${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leaderboard' }, schedule)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_settings' }, schedule)
       .subscribe((status) => {

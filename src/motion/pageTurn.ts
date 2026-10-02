@@ -18,11 +18,12 @@ export function decideKind(input: KindInput): TurnKind {
   if (input.reduced) return 'cut'
   if (input.active || input.sinceLastMs < 600) return 'cut'
   if (input.sameKey) return 'none'
+  // Guard <Navigate replace> must not curl, including when leaving admin.
+  if (input.navType === 'REPLACE' && !input.ziTurn) return 'cut'
   if (input.navType === 'POP') return 'fade'
   if (input.key === 'admin' || input.prevKey === 'admin' || input.key === 'notfound' || input.prevKey === 'notfound') {
     return 'fade'
   }
-  if (input.navType === 'REPLACE' && !input.ziTurn) return 'cut'
   if (input.mobile) return 'slide'
   return 'turn'
 }
