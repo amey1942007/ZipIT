@@ -12,7 +12,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CODE_PLAYGROUND_URL, ORGANISER_LINE, ORGANISER_SUBLINE } from '@/config/site'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,12 +58,7 @@ export function CodePlaygroundButton({
   className?: string
 }) {
   const label = compact ? 'Playground' : 'Code Playground'
-  const classes = cn(
-    'inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gold px-6 font-semibold text-on-gold',
-    hero && 'h-14 px-8 font-display text-h4 font-bold shadow-glow-gold',
-    !hero && 'shadow-glow-gold',
-    className,
-  )
+  const classes = cn('zi-abtn zi-abtn-primary', hero ? 'zi-abtn-hero' : 'zi-abtn', className)
   if (CODE_PLAYGROUND_URL) {
     return (
       <a className={classes} href={CODE_PLAYGROUND_URL} target="_blank" rel="noopener noreferrer">
@@ -147,7 +141,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       >
         Skip to main content
       </a>
-      <header role="banner" className="zi-backdrop sticky top-0 z-40 h-14 border-b border-[var(--zi-hairline-gold)] lg:h-16">
+      <header role="banner" className="zi-hud sticky top-0 z-40 h-14 border-b-2 border-[rgba(255,200,61,.55)] bg-ink lg:h-16">
         <div className="mx-auto flex h-full max-w-[1280px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
           <NavLink to="/" aria-label="ZipIT home" className="inline-flex min-h-11 items-center">
             <Wordmark />
@@ -161,21 +155,15 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
                   end={link.end}
                   title={link.label}
                   className={({ isActive }) =>
-                    cn(
-                      'relative inline-flex min-h-11 items-center justify-center rounded-full px-2 font-semibold text-text-muted lg:px-4',
-                      isActive && 'text-text',
-                    )
+                    cn('zi-tab relative', isActive ? 'zi-tab-active' : 'zi-tab-idle')
                   }
                 >
-                  {({ isActive }) => (
+                  {() => (
                     <>
                       {tablet ? <link.icon aria-hidden className="size-5" /> : <span>{link.label}</span>}
                       {tablet ? <span className="sr-only">{link.label}</span> : null}
                       {isAdmin && link.label === 'Admin' ? (
                         <span className="ml-1 rounded-full bg-primary px-2 text-xs font-semibold text-white">ADMIN</span>
-                      ) : null}
-                      {isActive ? (
-                        <span className="absolute bottom-0.5 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-sm bg-gold" />
                       ) : null}
                     </>
                   )}
@@ -187,9 +175,9 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
           )}
           <div className="ml-auto flex items-center gap-2">
             {leaderboardOnly ? (
-              <Button variant="outline" className="min-h-11 rounded-full" onClick={() => navigate('/login')}>
+              <button type="button" className="zi-abtn zi-abtn-primary" onClick={() => navigate('/login')}>
                 Sign in
-              </Button>
+              </button>
             ) : null}
             {session ? (
               <>
@@ -199,7 +187,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
                     <TeamMark size={narrow ? 36 : 40} name={name} />
                     <span className="sr-only">Account menu</span>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 rounded-sm border-[3px] border-ink bg-ivory text-ink shadow-hard ring-0">
                     <DropdownMenuLabel>
                       <span className="flex items-center gap-2">
                         <TeamMark size={40} name={name} />
@@ -239,15 +227,16 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       </header>
       <div className={cn('pb-24 sm:pb-0', arenaMobile && 'max-sm:pb-28')}>{children}</div>
       {session && !(arenaMobile && mobile) ? (
-        <footer className="border-t border-border px-4 py-8 text-center">
-          <p className="font-display text-xs font-semibold tracking-[0.12em] text-text-muted">{ORGANISER_LINE}</p>
-          <p className="text-xs text-text-muted">{ORGANISER_SUBLINE}</p>
+        <footer className="relative border-t-2 border-[rgba(255,200,61,.55)] bg-ink px-4 py-8 text-center">
+          <div className="ht-deep absolute inset-x-0 top-0 h-1.5" aria-hidden />
+          <p className="font-display text-xs font-semibold tracking-[0.12em] text-gold">{ORGANISER_LINE}</p>
+          <p className="text-[13px] text-ivory-muted">{ORGANISER_SUBLINE}</p>
         </footer>
       ) : null}
       {session && mobile ? (
         <nav
           aria-label="Primary"
-          className="zi-backdrop fixed inset-x-0 bottom-0 z-40 grid h-[calc(64px+env(safe-area-inset-bottom))] grid-cols-4 border-t border-[var(--zi-hairline-gold)] pb-[env(safe-area-inset-bottom)]"
+          className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(64px+env(safe-area-inset-bottom))] grid-cols-4 border-t-2 border-[rgba(255,200,61,.55)] bg-ink pb-[env(safe-area-inset-bottom)]"
         >
           {mobileNav.map((link) => (
             <NavLink
@@ -256,14 +245,14 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
               end={link.end}
               className={({ isActive }) =>
                 cn(
-                  'relative flex min-h-11 flex-col items-center justify-center gap-1 text-xs font-semibold text-text-muted',
+                  'relative flex min-h-11 flex-col items-center justify-center gap-1 text-xs font-semibold text-ivory-muted',
                   isActive && 'text-gold',
                 )
               }
             >
               {({ isActive }) => (
                 <>
-                  {isActive ? <span className="absolute inset-x-[30%] top-0 h-0.5 bg-gold" /> : null}
+                  {isActive ? <span className="absolute inset-x-0 top-0 h-[3px] bg-gold" /> : null}
                   <link.icon aria-hidden className="size-6" />
                   {link.label}
                 </>

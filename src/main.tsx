@@ -1,5 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { FxLayer } from '@/components/comic/FxLayer'
+import { MotionRoot } from '@/motion/MotionRoot'
 import App from '@/App'
 import '@/index.css'
 
@@ -15,6 +17,9 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <MotionRoot>
+      <App />
+      <FxLayer />
+    </MotionRoot>
   </StrictMode>,
 )

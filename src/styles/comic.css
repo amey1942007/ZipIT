@@ -1,0 +1,488 @@
+/* Concept 4 "Comic Circuit" tokens. Existing HUD and B3 board tokens stay in tokens.css. */
+:root {
+  /* palette aliases (comic surfaces only) */
+  --zi-ink: #1C0509;            /* deep: outlines, hard shadows, dark text */
+  --zi-maroon-c: #2B0A10;       /* panel fill dark */
+  --zi-red-c: #C8102E;          /* comic red */
+  --zi-gold-c: #FFC83D;
+  --zi-gold-hover: #FFD666;
+  --zi-ivory: #FFF6E8;
+  --zi-ivory-muted: rgba(255,246,232,.72);   /* 9.08:1 on maroon */
+
+  /* halftone: ONE radial-gradient layer, 0deg grid (axis-aligned), dot = solid radius / fade edge */
+  --zi-ht-ivory:     radial-gradient(circle, rgba(43,10,16,.20) 1.7px, transparent 2.2px) 0 0 / 9px 9px;
+  --zi-ht-ivory-red: radial-gradient(circle, rgba(200,16,46,.30) 2px, transparent 2.6px) 0 0 / 10px 10px;
+  --zi-ht-red:       radial-gradient(circle, rgba(28,5,9,.35) 2.2px, transparent 2.8px) 0 0 / 10px 10px;
+  --zi-ht-gold:      radial-gradient(circle, rgba(43,10,16,.28) 2px, transparent 2.6px) 0 0 / 10px 10px;
+  --zi-ht-maroon:    radial-gradient(circle, rgba(255,200,61,.20) 1.8px, transparent 2.4px) 0 0 / 10px 10px;
+  --zi-ht-deep:      radial-gradient(circle, rgba(200,16,46,.45) 2px, transparent 2.6px) 0 0 / 10px 10px;
+  --zi-ht-skeleton:  radial-gradient(circle, rgba(255,200,61,.12) 1.8px, transparent 2.4px) 0 0 / 10px 10px;
+
+  /* ink */
+  --zi-ink-panel: 3px;          /* panel outline: box-shadow inset 0 0 0 3px var(--zi-ink) */
+  --zi-ink-control: 3px;        /* buttons, balloons, cards */
+  --zi-ink-badge: 4px;          /* node badges, path head */
+  --zi-ink-edge: 2px;           /* gold inked edge drawn 3px inside a panel once "inked" */
+  --zi-ink-edge-color: rgba(255,200,61,.8);
+
+  /* layout */
+  --zi-gutter: 16px;            /* ≥640; 12px <640 */
+  --zi-rail: 32px;              /* outer margin that carries the path: 32 ≥1024, 16 640–1023, 12 <640 */
+  --zi-panel-radius: 2px;       /* no skew on panels; lettering is skewed, panels are not */
+  --zi-cut-lg: 16px;            /* caption box cut corners (TR + BL) */
+  --zi-cut-sm: 8px;             /* HUD readout cut corners */
+  --zi-cut-tab: 10px;           /* tabs and check chips */
+
+  /* hard offset shadows (never blurred) */
+  --zi-shadow-hard-sm: 3px 3px 0 var(--zi-ink);
+  --zi-shadow-hard:    6px 6px 0 var(--zi-ink);       /* buttons */
+  --zi-shadow-hard-lg: 10px 10px 0 var(--zi-ink);     /* dragged or moving cards and rows */
+  --zi-shadow-pop:     8px 8px 0 var(--zi-red-c);     /* hovered panel */
+  --zi-shadow-balloon: 5px 5px 0 rgba(28,5,9,.5);
+  --zi-filter-caption: drop-shadow(5px 5px 0 var(--zi-ink)); /* caption boxes (clip-path shapes) */
+  --zi-glow-gold: 0 0 18px rgba(255,200,61,.9);
+
+  /* gutter path */
+  --zi-path-edge-w: 17px;       /* gold under-stroke; 11px <640 */
+  --zi-path-core-w: 10px;       /* red core stroke;   6px <640 */
+  --zi-path-head-r: 11px;       /* gold dot, 4px ink stroke; 7px <640 */
+  --zi-badge: 46px;             /* 40px 640–1023, 32px <640 */
+  --zi-badge-font: 24px;        /* 20 / 16 */
+
+  /* HUD readout (.zi-tm) */
+  --zi-tm-font: 700 11px/1 var(--font-mono);   /* letter-spacing .08em, uppercase */
+  --zi-tm-pad: 5px 10px;
+  --zi-tm-bracket: 10px;        /* L-bracket arm length */
+  --zi-tm-bracket-w: 2px;
+  --zi-scan-dark:  repeating-linear-gradient(0deg, rgba(255,246,232,.06) 0 1px, transparent 1px 3px);
+  --zi-scan-light: repeating-linear-gradient(0deg, rgba(43,10,16,.05) 0 1px, transparent 1px 3px);
+
+  /* caption box (.zi-cbox) */
+  --zi-cbox-pad: 16px 20px;
+  --zi-cbox-bracket: 22px;
+  --zi-cbox-bracket-w: 4px;
+
+  /* lock-on */
+  --zi-lock-size: 20px;         /* each L-bracket 20×20 */
+  --zi-lock-w: 3px;
+  --zi-lock-inset: -14px;
+
+  /* SFX lettering (see §4.10 for geometry) */
+  --zi-sfx-skew: -14deg;
+  --zi-sfx-rotate: -7deg;
+  --zi-sfx-fill: var(--zi-gold-c);
+  --zi-sfx-stroke: var(--zi-maroon-c);          /* width 0.13 × font-size, paint-order: stroke */
+  --zi-sfx-shadow: var(--zi-ink);               /* offset 9,9 at fs 120 (= 0.075 × fs), width 0.16 × fs */
+  --zi-burst-fill: var(--zi-red-c);
+  --zi-burst-stroke: var(--zi-ink);             /* 7px, round joins */
+  --zi-word-skew: -8deg;                        /* big panel words: ONE PATH., EVERY CELL. */
+  --zi-word-shadow: 4px 4px 0 var(--zi-ink);    /* 5px at ≥ 90px font */
+
+  /* motion (durations) */
+  --zi-dur-slam: 260ms;  --zi-slam-stagger: 60ms;
+  --zi-dur-badge: 200ms; --zi-dur-ink: 240ms;
+  --zi-dur-path-hero: 1380ms; --zi-dur-path-step: 280ms;
+  --zi-dur-sfx-in: 180ms; --zi-dur-sfx-out: 200ms;
+  --zi-dur-shake: 350ms; --zi-dur-shake-error: 320ms;
+  --zi-dur-hover: 170ms; --zi-dur-lock: 200ms; --zi-dur-squash: 420ms;
+  --zi-dur-turn: 950ms; --zi-dur-slide-out: 320ms; --zi-dur-slide-in: 360ms;
+  --zi-dur-char: 12ms;   /* NODE caption typing per character */
+
+  /* motion (easings; forged/scan/inout already exist) */
+  --zi-ease-slam: cubic-bezier(0.34, 1.8, 0.64, 1);   /* panels, badges */
+  --zi-ease-pop:  cubic-bezier(0.34, 2.2, 0.64, 1);   /* SFX slam, stamps */
+  --zi-ease-out:  cubic-bezier(0.33, 1, 0.68, 1);     /* out-cubic: ink, hover */
+  --zi-ease-in:   cubic-bezier(0.4, 0, 1, 1);         /* exits */
+  --zi-ease-enter: cubic-bezier(0.2, 0, 0, 1);        /* slide enter */
+}
+@media (max-width: 1023px) { :root { --zi-rail: 16px; --zi-badge: 40px; --zi-badge-font: 20px; } }
+@media (max-width: 639px)  { :root { --zi-gutter: 12px; --zi-rail: 12px; --zi-badge: 32px; --zi-badge-font: 16px;
+                                     --zi-path-edge-w: 11px; --zi-path-core-w: 6px; --zi-path-head-r: 7px; } }
+
+@theme inline {
+  --color-ink: var(--zi-ink);
+  --color-ivory: var(--zi-ivory);
+  --color-ivory-muted: var(--zi-ivory-muted);
+  --color-comic-red: var(--zi-red-c);
+  --color-comic-gold: var(--zi-gold-c);
+  --color-comic-maroon: var(--zi-maroon-c);
+  --color-gold-hover: var(--zi-gold-hover);
+  --shadow-hard-sm: var(--zi-shadow-hard-sm);
+  --shadow-hard: var(--zi-shadow-hard);
+  --shadow-hard-lg: var(--zi-shadow-hard-lg);
+  --shadow-pop: var(--zi-shadow-pop);
+  --shadow-balloon: var(--zi-shadow-balloon);
+  --radius-panel: var(--zi-panel-radius);
+  --spacing-gutter: var(--zi-gutter);
+  --spacing-rail: var(--zi-rail);
+  --ease-forged: var(--zi-ease-forged);
+  --ease-scan: var(--zi-ease-scan);
+  --ease-slam: var(--zi-ease-slam);
+  --ease-pop: var(--zi-ease-pop);
+}
+
+@utility ht-ivory     { background: var(--zi-ht-ivory), var(--zi-ivory); }
+@utility ht-ivory-red { background: var(--zi-ht-ivory-red), var(--zi-ivory); }
+@utility ht-red       { background: var(--zi-ht-red), var(--zi-red-c); }
+@utility ht-gold      { background: var(--zi-ht-gold), var(--zi-gold-c); }
+@utility ht-maroon    { background: var(--zi-ht-maroon), var(--zi-maroon-c); }
+@utility ht-deep      { background: var(--zi-ht-deep), var(--zi-ink); }
+@utility ink-panel    { box-shadow: inset 0 0 0 var(--zi-ink-panel) var(--zi-ink); border-radius: var(--zi-panel-radius); }
+@utility cut-lg { clip-path: polygon(0 0, calc(100% - var(--zi-cut-lg)) 0, 100% var(--zi-cut-lg), 100% 100%, var(--zi-cut-lg) 100%, 0 calc(100% - var(--zi-cut-lg))); }
+@utility cut-sm { clip-path: polygon(0 0, calc(100% - var(--zi-cut-sm)) 0, 100% var(--zi-cut-sm), 100% 100%, var(--zi-cut-sm) 100%, 0 calc(100% - var(--zi-cut-sm))); }
+@utility comic-word   { font-family: var(--font-display); font-weight: 700; transform: skewX(var(--zi-word-skew)); text-shadow: var(--zi-word-shadow); line-height: .9; }
+
+.zi-hud::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--zi-scan-dark);
+  pointer-events: none;
+}
+
+.zi-panel {
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+  border-radius: var(--zi-panel-radius);
+  box-shadow: inset 0 0 0 var(--zi-ink-panel) var(--zi-ink);
+}
+
+.zi-panel > .base,
+.zi-panel > .fill {
+  position: absolute;
+  inset: 0;
+}
+
+.zi-panel > .edge {
+  position: absolute;
+  inset: 3px;
+  box-shadow: inset 0 0 0 var(--zi-ink-edge) var(--zi-ink-edge-color);
+  pointer-events: none;
+}
+
+.zi-panel > .content {
+  position: relative;
+}
+
+.zi-panel .ghost {
+  position: absolute;
+  right: 14px;
+  bottom: -24px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: min(190px, 70cqh);
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(28, 5, 9, 0.18);
+  pointer-events: none;
+  user-select: none;
+}
+
+.zi-cbox {
+  position: relative;
+  padding: var(--zi-cbox-pad);
+  color: var(--zi-ink);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--zi-cut-lg)) 0,
+    100% var(--zi-cut-lg),
+    100% 100%,
+    var(--zi-cut-lg) 100%,
+    0 calc(100% - var(--zi-cut-lg))
+  );
+  background:
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-cbox-bracket) var(--zi-cbox-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-cbox-bracket-w) var(--zi-cbox-bracket) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-cbox-bracket) var(--zi-cbox-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-cbox-bracket-w) var(--zi-cbox-bracket) no-repeat,
+    var(--zi-scan-light),
+    var(--zi-ivory);
+  filter: var(--zi-filter-caption);
+}
+
+.zi-cbox-red {
+  color: var(--zi-ivory);
+  background:
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-cbox-bracket) var(--zi-cbox-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-cbox-bracket-w) var(--zi-cbox-bracket) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-cbox-bracket) var(--zi-cbox-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-cbox-bracket-w) var(--zi-cbox-bracket) no-repeat,
+    var(--zi-scan-light),
+    var(--zi-red-c);
+}
+
+.zi-cbox h1,
+.zi-cbox h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(28px, 8cqh, 40px);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+}
+
+.zi-cbox-compact h1 {
+  font-size: 32px;
+  line-height: 1.02;
+}
+
+.zi-cbox p {
+  margin: 8px 0 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--zi-maroon-c);
+}
+
+.zi-cbox-red p {
+  color: var(--zi-ivory);
+}
+
+.zi-tm {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--zi-tm-pad);
+  font: var(--zi-tm-font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--zi-gold-c);
+  font-variant-numeric: tabular-nums;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--zi-cut-sm)) 0,
+    100% var(--zi-cut-sm),
+    100% 100%,
+    var(--zi-cut-sm) 100%,
+    0 calc(100% - var(--zi-cut-sm))
+  );
+  background:
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-tm-bracket) var(--zi-tm-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 0 0 / var(--zi-tm-bracket-w) var(--zi-tm-bracket) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-tm-bracket) var(--zi-tm-bracket-w) no-repeat,
+    linear-gradient(var(--zi-gold-c), var(--zi-gold-c)) 100% 100% / var(--zi-tm-bracket-w) var(--zi-tm-bracket) no-repeat,
+    var(--zi-scan-dark),
+    var(--zi-ink);
+}
+
+.zi-balloon {
+  position: relative;
+  background: var(--zi-ivory);
+  color: var(--zi-ink);
+  border: var(--zi-ink-control) solid var(--zi-ink);
+  border-radius: 46% 54% 50% 50% / 50% 46% 54% 50%;
+  box-shadow: var(--zi-shadow-balloon);
+  padding: 28px 34px;
+}
+
+.zi-balloon-tail {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  background: var(--zi-ivory);
+  border-right: 3px solid var(--zi-ink);
+  border-bottom: 3px solid var(--zi-ink);
+  transform: rotate(35deg) skewX(20deg);
+}
+
+.zi-balloon-tail-bl { left: 22%; bottom: -18px; }
+.zi-balloon-tail-br { right: 22%; bottom: -18px; }
+
+.zi-abtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 6px;
+  border: var(--zi-ink-control) solid var(--zi-ink);
+  box-shadow: var(--zi-shadow-hard-sm);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  transform-origin: 50% 100%;
+}
+
+.zi-abtn-hero {
+  height: 60px;
+  min-height: 60px;
+  padding: 0 28px;
+  font-size: 23px;
+  box-shadow: var(--zi-shadow-hard);
+}
+
+.zi-abtn-primary { background: var(--zi-gold-c); color: var(--zi-ink); }
+.zi-abtn-primary:hover { background: var(--zi-gold-hover); }
+.zi-abtn-danger { background: var(--zi-red-c); color: var(--zi-ivory); }
+.zi-abtn-ghost {
+  background: var(--zi-maroon-c);
+  color: var(--zi-ivory);
+  border: 2px solid rgba(255, 246, 232, 0.6);
+}
+
+.zi-abtn:active {
+  transform: translate(5px, 5px);
+  box-shadow: 1px 1px 0 var(--zi-ink);
+}
+
+.zi-badge {
+  display: inline-grid;
+  place-items: center;
+  width: var(--zi-badge);
+  height: var(--zi-badge);
+  border-radius: 50%;
+  background: var(--zi-ivory);
+  border: var(--zi-ink-badge) solid var(--zi-ink);
+  color: var(--zi-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--zi-badge-font);
+  line-height: 1;
+  box-shadow: 3px 3px 0 var(--zi-ink);
+}
+
+.zi-badge-reached {
+  background: var(--zi-gold-c);
+  box-shadow: 0 0 0 3px var(--zi-red-c), var(--zi-glow-gold), 3px 3px 0 var(--zi-ink);
+}
+
+.zi-tab {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--zi-cut-tab)) 0,
+    100% var(--zi-cut-tab),
+    100% 100%,
+    var(--zi-cut-tab) 100%,
+    0 calc(100% - var(--zi-cut-tab))
+  );
+}
+
+.zi-tab-idle {
+  background: var(--zi-maroon-c);
+  color: var(--zi-ivory);
+  box-shadow: inset 0 0 0 2px var(--zi-ink);
+}
+
+.zi-tab-idle:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--zi-gold-c);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.zi-tab-active {
+  background: var(--zi-gold-c);
+  color: var(--zi-ink);
+  box-shadow: var(--zi-shadow-hard-sm);
+}
+
+.zi-lock {
+  position: absolute;
+  inset: var(--zi-lock-inset);
+  pointer-events: none;
+}
+
+.zi-lock i {
+  position: absolute;
+  width: var(--zi-lock-size);
+  height: var(--zi-lock-size);
+  border: var(--zi-lock-w) solid var(--zi-gold-c);
+}
+
+.zi-lock i:nth-of-type(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.zi-lock i:nth-of-type(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.zi-lock i:nth-of-type(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.zi-lock i:nth-of-type(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+
+.zi-lock > span {
+  position: absolute;
+  left: 0;
+  top: -22px;
+}
+
+.zi-chip {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  font: 700 13px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--zi-ivory);
+  background: var(--zi-maroon-c);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--zi-cut-tab)) 0,
+    100% var(--zi-cut-tab),
+    100% 100%,
+    var(--zi-cut-tab) 100%,
+    0 calc(100% - var(--zi-cut-tab))
+  );
+  box-shadow: inset 0 0 0 2px var(--zi-ink);
+}
+
+.zi-skeleton {
+  background: var(--zi-ht-skeleton), var(--zi-maroon-c);
+  box-shadow: inset 0 0 0 var(--zi-ink-panel) var(--zi-ink);
+  border-radius: var(--zi-panel-radius);
+}
+
+.zi-toast {
+  animation: zi-toast-in 200ms var(--zi-ease-forged);
+}
+
+@keyframes zi-toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+.zi-cbox :focus-visible,
+.zi-balloon :focus-visible {
+  outline: 3px solid var(--zi-ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 7px var(--zi-gold-c);
+}
+
+@media (max-width: 639px) {
+  .zi-cbox-compact h1 { font-size: 24px; }
+  .zi-balloon { padding: 20px 22px; }
+  .zi-panel .ghost { font-size: min(120px, 70cqh); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zi-abtn:active { transform: none; }
+  .zi-abtn-primary:active { background: var(--zi-gold-hover); }
+  .zi-toast { animation: none; }
+  .zi-skeleton { animation: none; }
+}
+
+@media (prefers-contrast: more) {
+  .ht-ivory,
+  .ht-ivory-red,
+  .ht-red,
+  .ht-gold,
+  .ht-maroon,
+  .ht-deep {
+    background-image: none;
+  }
+  .zi-panel { box-shadow: inset 0 0 0 4px var(--zi-ink); }
+}

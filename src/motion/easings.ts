@@ -1,0 +1,11 @@
+export const FORGED = [0.22, 1, 0.36, 1] as const
+export const SCAN = [0.65, 0, 0.35, 1] as const
+export const INOUT = [0.37, 0, 0.63, 1] as const
+export const SLAM = [0.34, 1.8, 0.64, 1] as const
+export const POP = [0.34, 2.2, 0.64, 1] as const
+export const OUT = [0.33, 1, 0.68, 1] as const
+export const IN = [0.4, 0, 1, 1] as const
+export const ENTER = [0.2, 0, 0, 1] as const
+export const SPRING_HOVER = { type: 'spring', stiffness: 520, damping: 32, mass: 0.6 } as const
+export const SPRING_LIST = { type: 'spring', stiffness: 220, damping: 28 } as const
+export const SPRING_CARD = { type: 'spring', stiffness: 380, damping: 34 } as const

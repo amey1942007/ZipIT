@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
+@import "./styles/comic.css";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource/chakra-petch/latin-600.css";

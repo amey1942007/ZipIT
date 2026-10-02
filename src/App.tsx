@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
+import { HudReadout } from '@/components/comic/HudReadout'
 import { AppShell } from '@/components/shell/Shell'
 import { Toaster } from '@/components/ui/sonner'
 import { useAuth, AuthProvider } from '@/lib/auth'
@@ -7,6 +8,7 @@ import { ArenaPage } from '@/pages/ArenaPage'
 import { HomePage } from '@/pages/HomePage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
 import { LoginPage } from '@/pages/LoginPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SubmissionsPage } from '@/pages/SubmissionsPage'
 
@@ -22,7 +24,13 @@ function RequireSession({ admin = false }: { admin?: boolean }) {
   const { configured, ready, session, isAdmin } = useAuth()
   const location = useLocation()
   if (!configured) return <Outlet />
-  if (!ready) return <p className="px-6 py-10 text-text-muted">Loading…</p>
+  if (!ready) {
+    return (
+      <div className="grid min-h-40 place-items-center bg-ink">
+        <HudReadout>LOADING…</HudReadout>
+      </div>
+    )
+  }
   if (!session) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
   if (admin && !isAdmin) return <Navigate to="/" replace />
   return <Outlet />
@@ -48,8 +56,8 @@ export default function App() {
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/:tab" element={<AdminPage />} />
             </Route>
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
     </AuthProvider>
