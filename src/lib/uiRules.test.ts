@@ -1,34 +1,49 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AVATAR_CONVERT_ERROR, AVATAR_TYPE_ERROR, encodeAvatar, isWebpRiff } from '@/lib/avatarEncode'
 import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broadcast'
-import { friendlyDbError, friendlyStorageError, initials, loginEmail } from '@/lib/format'
+import { friendlyDbError, friendlyStorageError, initials, loginEmail, metricsLine } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
 import { buildSlots } from '@/lib/slots'
-import { firstUploadError, uploadCheckList } from '@/lib/uploadChecks'
+import { firstUploadError, pairFiles, uploadCheckList } from '@/lib/uploadChecks'
 
 const webp = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50,
 ])
 
 describe('upload checks', () => {
+  const f = (name: string, size = 10) => ({ name, size })
+
   it('stops at the first failure, in order', () => {
-    expect(firstUploadError({ names: ['a.py', 'b.py'], name: 'a.py', size: 10 })).toMatch(/one file/)
-    expect(firstUploadError({ names: ['A.PY'], name: 'A.PY', size: 0 })).toMatch(/lowercase \.py/)
-    expect(firstUploadError({ names: ['a.Py'], name: 'a.Py', size: 4 })).toMatch(/lowercase \.py/)
-    expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 0 })).toMatch(/empty/)
-    expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 262_145 })).toMatch(/256 KB/)
-    expect(firstUploadError({ names: ['a.py'], name: 'a.py', size: 12 })).toBeNull()
+    expect(firstUploadError([f('search.py')])).toMatch(/both files/)
+    expect(firstUploadError([f('search.py'), f('tiebreaker.py'), f('x.py')])).toMatch(/both files/)
+    expect(firstUploadError([f('Search.py'), f('tiebreaker.py')])).toMatch(/exactly search\.py/)
+    expect(firstUploadError([f('search.py'), f('search.py')])).toMatch(/exactly search\.py/)
+    expect(firstUploadError([f('search.py', 0), f('tiebreaker.py')])).toMatch(/search\.py is empty/)
+    expect(firstUploadError([f('search.py'), f('tiebreaker.py', 262_145)])).toMatch(/tiebreaker\.py is over 256 KB/)
+    expect(firstUploadError([f('tiebreaker.py'), f('search.py')])).toBeNull()
   })
 
   it('matches the first failing chip', () => {
-    const samples = [
-      { names: ['a.py', 'b.py'], name: 'a.py', size: 10 },
-      { names: ['a.py'], name: 'a.py', size: 12 },
-      { names: ['a.py'], name: 'a.py', size: 0 },
-    ]
+    const samples = [[f('a.py'), f('b.py')], [f('search.py'), f('tiebreaker.py')], [f('search.py', 0), f('tiebreaker.py')]]
     for (const sample of samples) {
       expect(firstUploadError(sample)).toBe(uploadCheckList(sample).find((check) => !check.ok)?.message ?? null)
     }
+  })
+
+  it('pairs the two files by name', () => {
+    const pair = pairFiles([f('tiebreaker.py', 2), f('search.py', 1)])
+    expect(pair?.search.size).toBe(1)
+    expect(pair?.tiebreaker.size).toBe(2)
+    expect(pairFiles([f('search.py')])).toBeNull()
+  })
+})
+
+describe('metrics line', () => {
+  it('formats solved boards and total time, and ignores missing metrics', () => {
+    expect(metricsLine({ solved: 18, boards: 20, total_time_s: 4.214 })).toBe('Solved 18/20 · 4.21 s')
+    expect(metricsLine({ solved: 3, boards: 20 })).toBe('Solved 3/20')
+    expect(metricsLine(null)).toBeNull()
+    expect(metricsLine([1, 2])).toBeNull()
   })
 })
 

@@ -1,6 +1,7 @@
 import { AVATAR_CHECK_ERROR } from '@/lib/avatarEncode'
 import type { Tables } from '@/lib/database.types'
-import { friendlyDbError, friendlyStorageError } from '@/lib/format'
+import { QUEUE_CAP } from '@/config/site'
+import { friendlyDbError, friendlyStorageError, QUEUE_FULL_MESSAGE } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
 export type SubmissionRow = Tables<'submissions'>
@@ -47,36 +48,67 @@ export async function fetchAllSubmissions(): Promise<SubmissionRow[]> {
   return data ?? []
 }
 
-export async function uploadSubmission(teamId: string, file: File): Promise<SubmissionRow> {
+export interface SubmissionFiles {
+  search: File
+  tiebreaker: File
+}
+
+const UPLOAD_FAILED = 'Upload failed. Check your connection and try again.'
+
+/** Queued + running rows across every team. Null when the RPC errors. */
+export async function fetchQueueDepth(): Promise<number | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase.rpc('scoring_queue_depth')
+  return error || data == null ? null : Number(data)
+}
+
+export async function uploadSubmission(
+  teamId: string,
+  files: SubmissionFiles,
+  source: 'upload' | 'playground' = 'upload',
+): Promise<SubmissionRow> {
   if (!supabase) throw new Error('backend')
+  const depth = await fetchQueueDepth()
+  if (depth != null && depth >= QUEUE_CAP) throw new Error(QUEUE_FULL_MESSAGE)
   const id = crypto.randomUUID()
-  const filePath = `${teamId}/${id}.py`
-  // The bucket only accepts text/x-python, and browsers report .py files inconsistently.
-  const body = new Blob([file], { type: 'text/x-python' })
-  const up = await supabase.storage.from('submissions').upload(filePath, body, {
-    contentType: 'text/x-python',
-    upsert: false,
-  })
-  if (up.error) {
-    throw new Error(friendlyStorageError(up.error) ?? 'Upload failed. Check your connection and try again.')
+  const searchPath = `${teamId}/${id}/search.py`
+  const tiebreakerPath = `${teamId}/${id}/tiebreaker.py`
+  for (const [path, file] of [
+    [searchPath, files.search],
+    [tiebreakerPath, files.tiebreaker],
+  ] as const) {
+    // The bucket only accepts text/x-python, and browsers report .py files inconsistently.
+    const body = new Blob([file], { type: 'text/x-python' })
+    const up = await supabase.storage.from('submissions').upload(path, body, {
+      contentType: 'text/x-python',
+      upsert: false,
+    })
+    if (up.error) throw new Error(friendlyStorageError(up.error) ?? UPLOAD_FAILED)
   }
   const inserted = await supabase
     .from('submissions')
     .insert({
       id,
       team_id: teamId,
-      source: 'upload',
-      file_path: filePath,
-      file_name: file.name,
-      size_bytes: file.size,
+      source,
+      file_path: searchPath,
+      file_name: files.search.name,
+      size_bytes: files.search.size,
+      tiebreaker_path: tiebreakerPath,
+      tiebreaker_size_bytes: files.tiebreaker.size,
     })
     .select('*')
     .single()
-  if (inserted.error) {
-    const friendly = friendlyDbError(inserted.error)
-    throw new Error(friendly ?? 'Upload failed. Check your connection and try again.')
-  }
+  if (inserted.error) throw new Error(friendlyDbError(inserted.error) ?? UPLOAD_FAILED)
   return inserted.data
+}
+
+export async function downloadSubmissionFiles(row: Pick<SubmissionRow, 'file_path' | 'tiebreaker_path'>): Promise<{
+  search: string
+  tiebreaker: string
+}> {
+  const [search, tiebreaker] = await Promise.all([downloadSubmission(row.file_path), downloadSubmission(row.tiebreaker_path)])
+  return { search, tiebreaker }
 }
 
 export async function saveAvatar(teamId: string, blob: Blob): Promise<{ avatar_path: string; updated_at: string }> {
