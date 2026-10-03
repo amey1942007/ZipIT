@@ -5,6 +5,7 @@ import engineSource from '@/workers/zipcomp/engine.py?raw'
 import gameSource from '@/workers/zipcomp/game.py?raw'
 import helpersInitSource from '@/workers/zipcomp/helpers_init.py?raw'
 import helpersPrimitivesSource from '@/workers/zipcomp/helpers_primitives.py?raw'
+import { SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE } from '@/playground/templates'
 
 interface PyodideProbe {
   runPython: (code: string) => unknown
@@ -128,6 +129,10 @@ json.dumps(out)
     const checks = check(SEARCH, TIEBREAKER)
     expect(checks.map((item) => item.id)).toEqual(['syntax', 'imports', 'classes', 'output', 'smoke'])
     expect(checks.every((item) => item.ok)).toBe(true)
+  })
+
+  it('passes the Playground starter templates', () => {
+    expect(check(SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE).every((item) => item.ok)).toBe(true)
   })
 
   it('reports each kind of problem with the file and line', () => {

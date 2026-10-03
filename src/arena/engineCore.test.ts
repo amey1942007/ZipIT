@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asResult, checksPassed, pathSteps, puzzleToBoard, validSolution } from '@/arena/engineCore'
+import { asResult, checksPassed, formatElapsed, pathSteps, puzzleToBoard, validSolution } from '@/arena/engineCore'
 import { frameAt } from '@/arena/playback'
 import type { ZipPuzzle } from '@/lib/zip/types'
 
@@ -43,6 +43,12 @@ describe('playback steps', () => {
     const steps = pathSteps([0, 1, 2, 5, 4, 3], 3)
     expect(steps).toHaveLength(5)
     expect(frameAt({ ...puzzle, seed: 0 }, steps, steps.length).path).toEqual([0, 1, 2, 5, 4, 3])
+  })
+
+  it('shows sub-second runs in milliseconds', () => {
+    expect(formatElapsed(0.0042)).toBe('4.2 ms')
+    expect(formatElapsed(3.456)).toBe('3.46 s')
+    expect(formatElapsed(undefined)).toBe('—')
   })
 
   it('needs all five checks to pass', () => {

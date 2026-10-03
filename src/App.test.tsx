@@ -11,6 +11,7 @@ const pages: Array<[hash: string, title: string | RegExp]> = [
   ['#/submissions', 'Submissions'],
   ['#/leaderboard', 'Leaderboard'],
   ['#/arena', 'Arena'],
+  ['#/playground', 'Code Playground'],
   ['#/admin/teams', 'Admin'],
 ]
 
