@@ -9,13 +9,17 @@ import { Panel } from '@/components/comic/Panel'
 import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Sfx } from '@/components/comic/Sfx'
 import { useAuth } from '@/lib/auth'
-import { fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
-import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore } from '@/lib/format'
+import { QUEUE_CAP } from '@/config/site'
+import { fetchQueueDepth, fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
+import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore, metricsLine } from '@/lib/format'
 import { buildSlots } from '@/lib/slots'
-import { uploadCheckList } from '@/lib/uploadChecks'
+import { pairFiles, uploadCheckList } from '@/lib/uploadChecks'
 import { playZipped } from '@/lib/sfx'
+import { clearStaged, readStaged, STAGED_DRAG_TYPE, stagedFiles, type StagedSubmission } from '@/lib/stagedSubmission'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useSubmissionFeed } from '@/lib/useLive'
+
+const QUEUE_POLL_MS = 15_000
 
 export function SubmissionsPage() {
   const { team, isAdmin } = useAuth()
@@ -26,21 +30,33 @@ export function SubmissionsPage() {
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [preview, setPreview] = useState<string[]>([])
+  const [staged, setStaged] = useState<StagedSubmission | null>(() => readStaged())
+  const [queue, setQueue] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const refreshQueue = useCallback(() => {
+    void fetchQueueDepth().then(setQueue)
+  }, [])
 
   const reload = useCallback(() => {
     if (!team) return
     void fetchSubmissions(team.id)
       .then(setRows)
       .catch(() => setMessage('Could not load submissions.'))
-  }, [team])
+    refreshQueue()
+  }, [team, refreshQueue])
 
   useEffect(() => {
     reload()
   }, [reload])
+  useEffect(() => {
+    if (!team) return
+    const timer = window.setInterval(refreshQueue, QUEUE_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [team, refreshQueue])
   useSubmissionFeed(team?.id ?? null, reload)
 
-  async function take(list: File[]) {
+  async function take(list: File[], source: 'upload' | 'playground' = 'upload') {
     if (!team && isSupabaseConfigured) return
     if (isAdmin) {
       setChecks(null)
@@ -49,24 +65,23 @@ export function SubmissionsPage() {
       setMessage(ADMIN_SUBMIT_MESSAGE)
       return
     }
-    const file = list[0]
-    const report = uploadCheckList({
-      names: list.map((item) => item.name),
-      name: file?.name ?? '',
-      size: file?.size ?? 0,
-    })
+    const report = uploadCheckList(list.map((item) => ({ name: item.name, size: item.size })))
     setChecks(report.map((item) => item.ok))
     const problem = report.find((item) => !item.ok)?.message ?? null
-    if (problem || !file) {
+    const pair = pairFiles(list)
+    if (problem || !pair) {
       setOutcome('error')
-      setMessage(problem ?? 'Upload one file at a time.')
+      setMessage(problem ?? 'Upload both files together: search.py and tiebreaker.py.')
       setPreview([])
       return
     }
     setBusy(true)
     setOutcome(null)
     setMessage('')
-    void file.text().then((text) => setPreview(text.split('\n').slice(0, 10).map((line) => line.slice(0, 90)))).catch(() => setPreview([]))
+    void pair.search
+      .text()
+      .then((text) => setPreview(text.split('\n').slice(0, 10).map((line) => line.slice(0, 90))))
+      .catch(() => setPreview([]))
     if (!isSupabaseConfigured || !team) {
       setOutcome('ok')
       setMessage('Preview only. Nothing was uploaded.')
@@ -75,22 +90,35 @@ export function SubmissionsPage() {
       return
     }
     try {
-      await uploadSubmission(team.id, file)
+      await uploadSubmission(team.id, pair, source)
       setOutcome('ok')
       setMessage('Uploaded. Scoring will update this page.')
       playZipped()
+      if (source === 'playground') {
+        clearStaged()
+        setStaged(null)
+      }
       reload()
     } catch (error) {
       setOutcome('error')
       setMessage(error instanceof Error ? error.message : 'Upload failed. Check your connection and try again.')
+      refreshQueue()
     } finally {
       setBusy(false)
     }
   }
 
+  function sendStaged() {
+    if (staged) void take(stagedFiles(staged), 'playground')
+  }
+
   function onDrop(event: DragEvent) {
     event.preventDefault()
     setOver(false)
+    if (staged && Array.from(event.dataTransfer.types).includes(STAGED_DRAG_TYPE)) {
+      sendStaged()
+      return
+    }
     void take(Array.from(event.dataTransfer.files))
   }
 
@@ -103,15 +131,55 @@ export function SubmissionsPage() {
           <div className="grid gap-4 p-5 text-ink">
             <HudReadout>YOUR FILES · PANEL 1/2</HudReadout>
             <ul className="grid gap-1 bg-ivory text-[15px] font-medium">
-              <li>One lowercase .py file</li>
-              <li>Up to 256 KB</li>
-              <li>The scorer calls next_move(grid, path, cost_map) and expects (r, c) back.</li>
+              <li>Two files: search.py and tiebreaker.py</li>
+              <li>Up to 256 KB each</li>
+              <li>search.py: class Score with score(self, node, board). Higher scores expand first.</li>
+              <li>tiebreaker.py: class TieBreaker with key(self, node, board). The greater key wins a tie.</li>
+              {queue != null ? (
+                <li className="font-mono text-sm font-bold tabular-nums">
+                  Scoring queue: {Math.min(queue, QUEUE_CAP)}/{QUEUE_CAP} in use
+                </li>
+              ) : null}
             </ul>
+            {staged ? (
+              <div className="grid gap-2">
+                <HudReadout>FROM THE PLAYGROUND</HudReadout>
+                <div
+                  draggable={!busy}
+                  onDragStart={(event) => {
+                    event.dataTransfer.setData(STAGED_DRAG_TYPE, '1')
+                    event.dataTransfer.effectAllowed = 'copy'
+                  }}
+                  className="grid cursor-grab gap-1 rounded border-[3px] border-dashed border-ink bg-ink p-3 font-mono text-sm font-bold text-ivory active:cursor-grabbing"
+                  aria-label="Playground files: search.py and tiebreaker.py. Drag into the big panel."
+                >
+                  <span>search.py</span>
+                  <span>tiebreaker.py</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <ActionButton type="button" variant="ghost" disabled={busy} onClick={sendStaged}>
+                    Send to panel
+                  </ActionButton>
+                  <ActionButton
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      clearStaged()
+                      setStaged(null)
+                    }}
+                  >
+                    Discard
+                  </ActionButton>
+                </div>
+              </div>
+            ) : null}
             <label className="zi-abtn zi-abtn-primary zi-abtn-hero relative w-fit">
               <input
                 ref={fileRef}
                 className="sr-only"
                 type="file"
+                multiple
                 accept=".py,text/x-python"
                 disabled={busy || (!team && isSupabaseConfigured)}
                 onChange={(event) => {
@@ -119,10 +187,10 @@ export function SubmissionsPage() {
                   event.target.value = ''
                 }}
               />
-              {busy ? 'Uploading…' : 'Choose file'}
+              {busy ? 'Uploading…' : 'Choose files'}
             </label>
             <Balloon>
-              <p>Drop it in the big panel →</p>
+              <p>{staged ? 'Drag your Playground files into the big panel →' : 'Drop both files in the big panel →'}</p>
             </Balloon>
           </div>
         </Panel>
@@ -143,7 +211,7 @@ export function SubmissionsPage() {
             >
               {busy ? <div className="zi-scan" aria-hidden /> : null}
               {preview.length === 0 ? (
-                <p className="font-display text-3xl font-bold text-gold -skew-x-8">DROP YOUR .py HERE</p>
+                <p className="font-display text-3xl font-bold text-gold -skew-x-8">DROP search.py + tiebreaker.py HERE</p>
               ) : (
                 <pre className="font-mono text-sm leading-relaxed text-ivory/80">
                   {preview.map((line, index) => (
@@ -154,10 +222,10 @@ export function SubmissionsPage() {
                   ))}
                 </pre>
               )}
-              <p className="mt-2 font-mono text-[13px] text-ivory-muted">or use Choose file · one .py · up to 256 KB</p>
+              <p className="mt-2 font-mono text-[13px] text-ivory-muted">or use Choose files · search.py + tiebreaker.py · up to 256 KB each</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['One file', 'Lowercase .py', 'Not empty', '≤ 256 KB', 'Uploaded', 'Queued'].map((label, index) => (
+              {['Two files', 'search.py + tiebreaker.py', 'Not empty', '≤ 256 KB each', 'Uploaded', 'Queued'].map((label, index) => (
                 <CheckChip key={label} label={label} state={chipState(index, checks, outcome)} delay={index * 120} />
               ))}
             </div>
@@ -212,6 +280,9 @@ export function SubmissionsPage() {
                   <p className="truncate font-mono text-[15px] font-bold">{slot.submission.file_name}</p>
                   <p>{slot.scoring ? 'Scoring…' : slot.submission.status}</p>
                   <p className="font-display text-[40px] font-bold text-gold tabular-nums">{formatScore(slot.submission.score)}</p>
+                  {metricsLine(slot.submission.metrics) ? (
+                    <p className="font-mono text-xs font-bold tabular-nums">{metricsLine(slot.submission.metrics)}</p>
+                  ) : null}
                   <p className="font-mono text-xs text-ivory-muted tabular-nums">{formatIst(slot.submission.created_at, true)}</p>
                   {slot.submission.error ? <p className="bg-comic-red px-2 py-1 text-ivory">{slot.submission.error}</p> : null}
                   {slot.also ? <p>Also {slot.also}</p> : null}

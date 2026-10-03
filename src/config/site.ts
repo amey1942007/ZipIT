@@ -11,6 +11,8 @@ export const FEATURES = {
 } as const
 export const UPLOAD_MAX_BYTES = 262_144
 export const PY_EXT = /\.py$/
+/** Queued + running submissions allowed across all teams (enforced by enforce_queue_cap). */
+export const QUEUE_CAP = 3
 export const STEP_CAP = 15_000
 export const RUN_TIMEOUT_MS = 10_000
 export const PASSWORD_MIN = 8

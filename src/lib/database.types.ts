@@ -183,6 +183,8 @@ export type Database = {
           source: string
           status: string
           team_id: string
+          tiebreaker_path: string
+          tiebreaker_size_bytes: number
         }
         Insert: {
           created_at?: string
@@ -197,6 +199,8 @@ export type Database = {
           source: string
           status?: string
           team_id: string
+          tiebreaker_path: string
+          tiebreaker_size_bytes: number
         }
         Update: {
           created_at?: string
@@ -211,6 +215,8 @@ export type Database = {
           source?: string
           status?: string
           team_id?: string
+          tiebreaker_path?: string
+          tiebreaker_size_bytes?: number
         }
         Relationships: [
           {
@@ -268,6 +274,7 @@ export type Database = {
       own_submission_file_exists: { Args: { p_path: string }; Returns: boolean }
       prune_submissions: { Args: { p_team: string }; Returns: undefined }
       refresh_leaderboard: { Args: never; Returns: undefined }
+      scoring_queue_depth: { Args: never; Returns: number }
       submission_orphan_files: {
         Args: { p_limit?: number }
         Returns: {

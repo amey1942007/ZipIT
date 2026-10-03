@@ -6,6 +6,7 @@ export interface SlotSubmission {
   error: string | null
   file_name: string
   scored_at: string | null
+  metrics?: unknown
 }
 
 export type SlotLabel = 'BEST' | '2ND' | '3RD' | 'LATEST'

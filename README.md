@@ -47,6 +47,34 @@ Pushes to `main` run `.github/workflows/deploy.yml`. Pull requests run `.github/
 
 The app uses `HashRouter` from `react-router`, so Pages does not need a rewrite. Opening the site with no hash lands on Login (`#/login`). The other stubs are Home (`#/`), Profile, Submissions, Leaderboard, Arena, and Admin.
 
+## Submissions and the Mac mini scorer
+
+A submission is two files, following the ZipIt_ARIES engine contract:
+
+- `search.py`: `class Score` with `score(self, node, board) -> number` (higher expands first) and an optional `prune(self, node, board) -> bool`.
+- `tiebreaker.py`: `class TieBreaker` with `key(self, node, board) -> tuple` (the greater key wins a tie).
+
+The browser uploads both files to the private `submissions` bucket at `{team_id}/{submission_id}/search.py` and `{team_id}/{submission_id}/tiebreaker.py`, then inserts one `submissions` row (`file_path`, `tiebreaker_path`, `status = 'queued'`). At most **3** rows may be `queued` or `running` across all teams (`enforce_queue_cap`). `scoring_queue_depth()` returns the current count.
+
+The scorer runs on the Mac mini with the service key from its own environment, never from this repo. It processes **one submission at a time**:
+
+1. Pick the oldest `queued` row and set `status = 'running'`.
+2. Download `file_path` and `tiebreaker_path` into a fresh `submissions/submission_NN/` folder as `search.py` and `tiebreaker.py`.
+3. Run the ZipIt_ARIES evaluation (`evaluate_submission`) on the event test set.
+4. Write the result to the same row:
+
+| Column | Value |
+| --- | --- |
+| `status` | `scored`, or `failed` when the files do not load or the run crashes |
+| `score` | One number, higher is better: `solved * 1000 + speed_bonus`, where `speed_bonus` is 0 to 999 |
+| `scored_at` | `now()` |
+| `metrics` | JSON object: `set`, `boards`, `solved`, `total_time_s`, `total_expansions`, `total_backtracks` (extra keys are fine) |
+| `error` | Short, participant-safe message when `failed` (no stack traces or paths) |
+
+5. Delete the temporary folder.
+
+Writing `status` or `score` refreshes the leaderboard and prunes old runs automatically (top 3 scored plus the latest per team). The Submissions page shows `metrics.solved`, `metrics.boards` and `metrics.total_time_s` when present.
+
 ## Pyodide
 
 The Arena loads Python in a Web Worker from a self-hosted Pyodide 314.0.7 runtime. Those files are not committed. `scripts/fetch-pyodide.mjs` copies the browser runtime out of the pinned `pyodide` npm package into `public/pyodide/314.0.7/` on `postinstall` and again before `vite build`. Vite then publishes that directory with the site, so the worker never uses a CDN. `public/pyodide/` is gitignored.

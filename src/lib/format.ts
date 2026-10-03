@@ -60,15 +60,25 @@ export function initials(name: string): string {
   return `${parts[0]![0]!}${parts[1]![0]!}`.toUpperCase()
 }
 
+export const QUEUE_FULL_MESSAGE = 'The scoring queue is full (3 runs waiting). Try again in a minute.'
+
 export function friendlyDbError(error: { code?: string; message?: string } | null): string | null {
   if (!error) return null
   const message = error.message ?? ''
-  if (message.startsWith('queue_full') || error.code === 'P0001') {
-    return 'The scoring queue is full. Try again in a minute.'
-  }
+  if (message.startsWith('queue_full') || error.code === 'P0001') return QUEUE_FULL_MESSAGE
   if (error.code === '23514') return "Couldn't save the avatar. Try again."
   if (error.code === '42501') return "That upload wasn't accepted. Try again."
   return null
+}
+
+/** "Solved 18/20 · 4.21 s" from the scorer's metrics, or null when it hasn't reported them. */
+export function metricsLine(metrics: unknown): string | null {
+  if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) return null
+  const m = metrics as Record<string, unknown>
+  const parts: string[] = []
+  if (typeof m.solved === 'number' && typeof m.boards === 'number') parts.push(`Solved ${m.solved}/${m.boards}`)
+  if (typeof m.total_time_s === 'number' && Number.isFinite(m.total_time_s)) parts.push(`${m.total_time_s.toFixed(2)} s`)
+  return parts.length ? parts.join(' · ') : null
 }
 
 export const ADMIN_SUBMIT_MESSAGE = "Admin accounts can't submit. Sign in with a team account to upload."
