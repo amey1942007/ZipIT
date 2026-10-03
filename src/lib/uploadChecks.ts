@@ -12,7 +12,9 @@ export interface UploadFileInfo {
 export type UploadCheckId = 'count' | 'names' | 'empty' | 'size'
 
 const COUNT_MESSAGE = 'Upload both files together: search.py and tiebreaker.py.'
-const NAMES_MESSAGE = 'Name the files exactly search.py and tiebreaker.py (lowercase).'
+function namesMessage(names: string[]): string {
+  return `You uploaded ${names.join(' and ')}. Name the files exactly search.py and tiebreaker.py (lowercase).`
+}
 
 /** Same order and copy as `firstUploadError`. */
 export function uploadCheckList(files: UploadFileInfo[]): { id: UploadCheckId; ok: boolean; message: string }[] {
@@ -21,7 +23,7 @@ export function uploadCheckList(files: UploadFileInfo[]): { id: UploadCheckId; o
   const big = files.find((file) => file.size > UPLOAD_MAX_BYTES)
   return [
     { id: 'count', ok: files.length === 2, message: COUNT_MESSAGE },
-    { id: 'names', ok: names.length === 2 && names[0] === SEARCH_FILE && names[1] === TIEBREAKER_FILE, message: NAMES_MESSAGE },
+    { id: 'names', ok: names.length === 2 && names[0] === SEARCH_FILE && names[1] === TIEBREAKER_FILE, message: namesMessage(names) },
     { id: 'empty', ok: !empty, message: `${empty?.name ?? 'That file'} is empty.` },
     { id: 'size', ok: !big, message: `${big?.name ?? 'That file'} is over 256 KB. Upload a smaller file.` },
   ]

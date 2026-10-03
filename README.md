@@ -54,6 +54,8 @@ A submission is two files, following the ZipIt_ARIES engine contract:
 - `search.py`: `class Score` with `score(self, node, board) -> number` (higher expands first) and an optional `prune(self, node, board) -> bool`.
 - `tiebreaker.py`: `class TieBreaker` with `key(self, node, board) -> tuple` (the greater key wins a tie).
 
+Before anything is uploaded, the Submissions page requires the exact names `search.py` and `tiebreaker.py`, refuses the unedited starter templates, and runs the same in-browser Python checks as the Playground (syntax, imports, classes, output format, 3×3 warm-up). A failed check uploads nothing and takes no queue slot. These checks run in the participant's browser, so the scorer must still treat a crash as `failed`.
+
 The browser uploads both files to the private `submissions` bucket at `{team_id}/{submission_id}/search.py` and `{team_id}/{submission_id}/tiebreaker.py`, then inserts one `submissions` row (`file_path`, `tiebreaker_path`, `status = 'queued'`). At most **3** rows may be `queued` or `running` across all teams (`enforce_queue_cap`). `scoring_queue_depth()` returns the current count.
 
 The scorer runs on the Mac mini with the service key from its own environment, never from this repo. It processes **one submission at a time**:

@@ -17,6 +17,7 @@ describe('upload checks', () => {
     expect(firstUploadError([f('search.py')])).toMatch(/both files/)
     expect(firstUploadError([f('search.py'), f('tiebreaker.py'), f('x.py')])).toMatch(/both files/)
     expect(firstUploadError([f('Search.py'), f('tiebreaker.py')])).toMatch(/exactly search\.py/)
+    expect(firstUploadError([f('Search.py'), f('tiebreaker.py')])).toMatch(/^You uploaded Search\.py and tiebreaker\.py\./)
     expect(firstUploadError([f('search.py'), f('search.py')])).toMatch(/exactly search\.py/)
     expect(firstUploadError([f('search.py', 0), f('tiebreaker.py')])).toMatch(/search\.py is empty/)
     expect(firstUploadError([f('search.py'), f('tiebreaker.py', 262_145)])).toMatch(/tiebreaker\.py is over 256 KB/)
