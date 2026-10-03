@@ -70,3 +70,21 @@ export function friendlyDbError(error: { code?: string; message?: string } | nul
   if (error.code === '42501') return "That upload wasn't accepted. Try again."
   return null
 }
+
+export const ADMIN_SUBMIT_MESSAGE = "Admin accounts can't submit. Sign in with a team account to upload."
+
+/** Storage API errors carry no Postgres code, only a message and an HTTP status. Never show the raw text. */
+export function friendlyStorageError(error: { message?: string; statusCode?: string | number } | null): string | null {
+  if (!error) return null
+  const message = error.message ?? ''
+  if (/row-level security|unauthori[sz]ed|403/i.test(message) || String(error.statusCode) === '403') {
+    return "That upload wasn't accepted. Try again."
+  }
+  if (/mime type|not supported/i.test(message)) {
+    return 'Only .py files can be uploaded. Rename the file so it ends in lowercase .py.'
+  }
+  if (/maximum allowed size|too large|payload/i.test(message)) {
+    return 'That file is over 256 KB. Upload a smaller .py file.'
+  }
+  return null
+}

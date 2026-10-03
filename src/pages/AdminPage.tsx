@@ -27,6 +27,9 @@ const TABS = [
 
 type AdminTab = (typeof TABS)[number][0]
 
+export const ADMIN_NOTE =
+  'Admins can edit team profiles (name, avatar, password). Submissions and scores are view-only.'
+
 function isAdminTab(value: string | undefined): value is AdminTab {
   return TABS.some(([id]) => id === value)
 }
@@ -89,7 +92,7 @@ export function AdminPage() {
         current={`/admin/${tab}`}
         tabs={TABS.map(([id, label]) => ({ to: `/admin/${id}`, label }))}
       />
-      <p>The admin page has no write actions; the site is view-only for the admin.</p>
+      <p>{ADMIN_NOTE}</p>
       {message ? <p className="text-text-muted">{message}</p> : null}
 
       {tab === 'teams' ? (
@@ -120,9 +123,14 @@ export function AdminPage() {
                     <td className="px-3 py-2 font-mono text-sm">@{row.username}</td>
                     <td className="px-3 py-2">{row.role}</td>
                     <td className="px-3 py-2">
-                      <Link to={`/admin/submissions?team=${row.id}`} className="font-semibold text-gold">
-                        Open replays
-                      </Link>
+                      <div className="flex flex-wrap gap-3">
+                        <Link to={`/admin/submissions?team=${row.id}`} className="font-semibold text-gold">
+                          Open replays
+                        </Link>
+                        <Link to={`/profile?team=${row.id}`} className="font-semibold text-gold">
+                          Edit profile
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

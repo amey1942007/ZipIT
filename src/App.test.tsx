@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import App from '@/App'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
+import { ADMIN_NOTE } from '@/pages/AdminPage'
 
 const pages: Array<[hash: string, title: string | RegExp]> = [
   ['#/login', 'Login'],
@@ -53,7 +54,7 @@ describe('foundation', () => {
     expect(nav).toHaveTextContent('Leaderboard')
     expect(nav).toHaveTextContent('Audit')
     expect(nav).not.toHaveTextContent('Scores')
-    expect(screen.getByText('The admin page has no write actions; the site is view-only for the admin.')).toBeInTheDocument()
+    expect(screen.getByText(ADMIN_NOTE)).toBeInTheDocument()
     expect(screen.getByLabelText('Search')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /freeze/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create/i })).not.toBeInTheDocument()
