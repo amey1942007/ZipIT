@@ -17,8 +17,9 @@ export const RUN_TIMEOUT_MS = 10_000
 export const PASSWORD_MIN = 8
 export const GRID_SIZES = [5, 6, 7, 8] as const
 export const DEFAULT_GRID = 6
-export const SPEEDS = [1, 4, 16, 64] as const
-export const SPEED_STEPS_PER_S = { 1: 8, 4: 32, 16: 128, 64: 512 } as const
+export const SPEEDS = [1, 4, 16, 64, 256, 1024] as const
+/** Arena playback: one step is one engine expansion. */
+export const SPEED_STEPS_PER_S = { 1: 8, 4: 32, 16: 128, 64: 512, 256: 2048, 1024: 8192 } as const
 export const LIVE_ANNOUNCE_THROTTLE_MS = 5_000
 /** Logged-out leaderboard and the home top-3 panel share this cap. 0 hides both. */
 export const PUBLIC_BOARD_TOP_N = 10

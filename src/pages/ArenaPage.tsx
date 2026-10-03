@@ -6,14 +6,12 @@ import {
   checksPassed,
   EngineClient,
   formatElapsed,
-  pathSteps,
   STATUS_LABELS,
   type CheckResult,
   type EngineResult,
   type SubmissionCode,
 } from '@/arena/engine'
-import { frameAt } from '@/arena/playback'
-import type { ReplayStep } from '@/arena/replayContract'
+import { indexTrace, traceFrame, type TraceFrame, type TraceIndex } from '@/arena/trace'
 import { DEFAULT_GRID, GRID_SIZES, SPEEDS, SPEED_STEPS_PER_S } from '@/config/site'
 import { useCellSize } from '@/components/arena/useCellSize'
 import { ZipBoard } from '@/components/arena/ZipBoard'
@@ -30,12 +28,38 @@ import { generatePuzzle, type GeneratedPuzzle } from '@/lib/zip/generate'
 
 /** The Arena keeps the current Zip and the one before it. A third New Zip drops the oldest. */
 const HISTORY_SIZE = 2
+/** Autoplay picks the slowest speed that shows the whole search in about this long. */
+const AUTOPLAY_TARGET_S = 20
 
 interface ZipEntry {
   key: number
   puzzle: GeneratedPuzzle
   result: EngineResult | null
-  steps: ReplayStep[]
+  trace: TraceIndex | null
+}
+
+function autoSpeed(frames: number): (typeof SPEEDS)[number] {
+  return SPEEDS.find((value) => frames / SPEED_STEPS_PER_S[value] <= AUTOPLAY_TARGET_S) ?? SPEEDS[SPEEDS.length - 1]!
+}
+
+function finalFrame(puzzle: GeneratedPuzzle, result: EngineResult | null): TraceFrame {
+  const path = result?.path.length ? result.path : [puzzle.waypoints[0] ?? 0]
+  return {
+    path,
+    abandoned: [],
+    head: path[path.length - 1] ?? null,
+    jumped: false,
+    tie: false,
+    score: Number.NaN,
+    backtracksSoFar: 0,
+    waypointsReached: puzzle.waypoints.filter((cell) => path.includes(cell)).length,
+  }
+}
+
+function stepText(frame: TraceFrame, index: number, traced: boolean): string {
+  if (!traced) return '—'
+  const kind = index === 0 ? 'Start on dot 1' : frame.jumped ? 'Backtracked: jumped to another branch' : 'Extended the path'
+  return frame.tie ? `${kind} · the tie-breaker decided` : kind
 }
 
 function chipState(id: (typeof CHECK_ORDER)[number], checks: CheckResult[] | null): 'idle' | 'ok' | 'bad' {
@@ -96,7 +120,8 @@ export function ArenaPage() {
 
   const entry = showPrevious && history.length >= 2 ? history[history.length - 2]! : history[history.length - 1] ?? null
   const puzzle = entry?.puzzle ?? null
-  const steps = useMemo(() => entry?.steps ?? [], [entry])
+  const traced = entry?.trace ?? null
+  const frames = traced?.size ?? 0
   const cell = useCellSize(puzzle?.cols ?? grid, boardSlot)
 
   useEffect(() => {
@@ -134,7 +159,7 @@ export function ArenaPage() {
       return
     }
     const key = ++keyRef.current
-    setHistory((list) => [...list, { key, puzzle: generated, result: null, steps: [] }].slice(-HISTORY_SIZE))
+    setHistory((list) => [...list, { key, puzzle: generated, result: null, trace: null }].slice(-HISTORY_SIZE))
     setShowPrevious(false)
     setIndex(0)
     setPlaying(false)
@@ -152,11 +177,21 @@ export function ArenaPage() {
       setNote('Fix the failed check before running.')
       return
     }
-    const nextSteps = pathSteps(result.path, generated.cols)
-    setHistory((list) => list.map((item) => (item.key === key ? { ...item, result, steps: nextSteps } : item)))
+    const trace = result.trace ? indexTrace(result.trace) : null
+    setHistory((list) => list.map((item) => (item.key === key ? { ...item, result, trace } : item)))
     setIndex(0)
-    setPlaying(nextSteps.length > 0)
-    setNote(result.solved ? '' : 'Showing the deepest path the search reached.')
+    if (trace) setSpeed(autoSpeed(trace.size))
+    setPlaying((trace?.size ?? 0) > 1)
+    const expansions = result.stats.expansions
+    if (!trace) {
+      setNote('This run sent back no search log, so only the final path is shown.')
+    } else if (typeof expansions === 'number' && expansions !== trace.size) {
+      setNote(`The search log has ${trace.size} of ${expansions} expansions.`)
+    } else if (!result.solved) {
+      setNote(`${STATUS_LABELS[result.status]}. Every expansion is shown: scrub back to see where the search went wrong.`)
+    } else {
+      setNote('')
+    }
   }, [])
 
   useEffect(() => {
@@ -195,20 +230,27 @@ export function ArenaPage() {
   }, [selected, runOn])
 
   useEffect(() => {
-    if (!playing || steps.length === 0) return
+    if (!playing || frames <= 1) return
+    const rate = SPEED_STEPS_PER_S[speed]
+    const tickMs = Math.max(1000 / rate, 33)
+    const perTick = Math.max(1, Math.round((rate * tickMs) / 1000))
     const timer = window.setInterval(() => {
       setIndex((current) => {
-        if (current >= steps.length) {
+        if (current >= frames - 1) {
           setPlaying(false)
           return current
         }
-        return current + 1
+        return Math.min(frames - 1, current + perTick)
       })
-    }, 1000 / SPEED_STEPS_PER_S[speed])
+    }, tickMs)
     return () => window.clearInterval(timer)
-  }, [playing, speed, steps.length])
+  }, [playing, speed, frames])
 
-  const frame = useMemo(() => (puzzle ? frameAt(puzzle, steps, index) : null), [puzzle, steps, index])
+  const result = entry?.result ?? null
+  const frame = useMemo(() => {
+    if (!puzzle) return null
+    return traced ? traceFrame(traced, index, puzzle.waypoints) : finalFrame(puzzle, result)
+  }, [puzzle, traced, index, result])
 
   function pick(id: string) {
     const query = viewedTeam ? `?team=${encodeURIComponent(viewedTeam)}` : ''
@@ -219,8 +261,8 @@ export function ArenaPage() {
     if (code && checksPassed(checks)) void runOn(code, grid)
   }
 
-  const result = entry?.result ?? null
-  const playbackOff = steps.length === 0 || busy
+  const playbackOff = frames <= 1 || busy
+  const last = Math.max(frames - 1, 0)
   const solved = Boolean(result?.solved && frame && puzzle && frame.path.length === puzzle.rows * puzzle.cols)
   const failed = checks?.find((item) => !item.ok) ?? null
   const modeLabel = viewOnly ? `VIEW ONLY · ${viewedTeam}` : 'RUN'
@@ -275,10 +317,10 @@ export function ArenaPage() {
                 <ZipBoard
                   puzzle={puzzle}
                   path={frame.path}
-                  backtracked={frame.backtracked}
+                  backtracked={frame.abandoned}
                   head={frame.head}
                   cell={cell}
-                  showLine={steps.length > 0}
+                  showLine={frame.path.length > 1}
                   playing={playing}
                 />
               </div>
@@ -325,16 +367,38 @@ export function ArenaPage() {
             <div className="grid gap-1 font-mono text-sm font-bold text-text-muted tabular-nums">
               <p>Status: {busy ? 'Running…' : result ? STATUS_LABELS[result.status] : '—'}</p>
               <p>
+                Expansion:{' '}
+                {traced ? `${(Math.min(index, last) + 1).toLocaleString('en-IN')} of ${frames.toLocaleString('en-IN')}` : (stats.expansions ?? '—')}
+              </p>
+              <p>This step: {frame ? stepText(frame, index, Boolean(traced)) : '—'}</p>
+              <p>Score: {frame && Number.isFinite(frame.score) ? formatScore(frame.score) : '—'}</p>
+              <p>
                 Path: {frame ? frame.path.length : 0}/{total || '—'} cells
               </p>
-              <p>Expansions: {stats.expansions ?? '—'}</p>
-              <p>Backtracks: {stats.backtracks ?? '—'}</p>
+              <p>
+                Backtracks:{' '}
+                {traced && frame
+                  ? `${frame.backtracksSoFar.toLocaleString('en-IN')} of ${traced.totalBacktracks.toLocaleString('en-IN')}`
+                  : (stats.backtracks ?? '—')}
+              </p>
               <p>Time: {formatElapsed(stats.elapsed)}</p>
             </div>
+            {traced ? (
+              <p className="text-sm text-text-muted">
+                Each step is one node your code made the engine expand. Hatched cells are the branch it last gave up.
+              </p>
+            ) : null}
             {result?.error ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{result.error}</p> : null}
             <p className="text-sm text-text-muted">Arena runs are practice only. Official scores come from the scorer.</p>
             <div className="flex flex-wrap gap-2">
-              <ActionButton type="button" disabled={playbackOff} onClick={() => setPlaying((value) => !value)}>
+              <ActionButton
+                type="button"
+                disabled={playbackOff}
+                onClick={() => {
+                  if (!playing && index >= last) setIndex(0)
+                  setPlaying((value) => !value)
+                }}
+              >
                 {playing ? 'Pause' : 'Play'}
               </ActionButton>
               <ActionButton
@@ -354,10 +418,21 @@ export function ArenaPage() {
                 disabled={playbackOff}
                 onClick={() => {
                   setPlaying(false)
-                  setIndex((value) => Math.min(steps.length, value + 1))
+                  setIndex((value) => Math.min(last, value + 1))
                 }}
               >
                 Step forward
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                type="button"
+                disabled={playbackOff}
+                onClick={() => {
+                  setPlaying(false)
+                  setIndex(last)
+                }}
+              >
+                Jump to end
               </ActionButton>
             </div>
             <label className="grid gap-2 text-sm text-ivory-muted">
@@ -365,8 +440,8 @@ export function ArenaPage() {
               <input
                 type="range"
                 min={0}
-                max={Math.max(steps.length, 0)}
-                value={Math.min(index, steps.length)}
+                max={last}
+                value={Math.min(index, last)}
                 disabled={playbackOff}
                 onChange={(event) => {
                   setPlaying(false)

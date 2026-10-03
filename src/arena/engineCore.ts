@@ -36,6 +36,20 @@ export interface EngineStats {
   elapsed?: number
 }
 
+/** Every expansion in engine order. Index k is the node the engine expanded k-th (its eid). */
+export interface EngineTrace {
+  heads: Int32Array
+  /** Index of the expansion this node grew from; -1 for the start node. Always < k. */
+  parents: Int32Array
+  /** score() of the node; NaN when it was not a finite number. */
+  scores: Float64Array
+  /** Bit 1: the tie-breaker decided this pop. Bit 2: the engine counted a backtrack. */
+  flags: Uint8Array
+}
+
+export const TRACE_TIE = 1
+export const TRACE_BACKTRACK = 2
+
 export interface EngineResult {
   status: EngineStatus
   error: string | null
@@ -43,6 +57,7 @@ export interface EngineResult {
   path: number[]
   solved: boolean
   stats: EngineStats
+  trace: EngineTrace | null
 }
 
 export interface SubmissionCode {
@@ -129,7 +144,7 @@ export function asChecks(value: unknown): CheckResult[] {
 
 /** Validates the worker's reply on the main thread; a "solved" path that breaks the rules is an error. */
 export function asResult(value: unknown, puzzle: ZipPuzzle): EngineResult {
-  const raw = (value ?? {}) as { status?: string; error?: string | null; path?: unknown; stats?: EngineStats }
+  const raw = (value ?? {}) as { status?: string; error?: string | null; path?: unknown; stats?: EngineStats; trace?: unknown }
   const status = (Object.keys(STATUS_LABELS) as EngineStatus[]).includes(raw.status as EngineStatus)
     ? (raw.status as EngineStatus)
     : 'error'
@@ -145,5 +160,35 @@ export function asResult(value: unknown, puzzle: ZipPuzzle): EngineResult {
     path,
     solved,
     stats: raw.stats && typeof raw.stats === 'object' ? raw.stats : {},
+    trace: asTrace(raw.trace, puzzle.rows * puzzle.cols),
   }
+}
+
+/** Null unless every array lines up and every parent points at an earlier expansion. */
+export function asTrace(value: unknown, cells: number): EngineTrace | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as { heads?: unknown; parents?: unknown; scores?: unknown; flags?: unknown }
+  const { heads, parents, scores, flags } = raw
+  if (!Array.isArray(heads) || !Array.isArray(parents) || !Array.isArray(scores) || !Array.isArray(flags)) return null
+  const size = heads.length
+  if (size === 0 || parents.length !== size || scores.length !== size || flags.length !== size) return null
+  const trace: EngineTrace = {
+    heads: new Int32Array(size),
+    parents: new Int32Array(size),
+    scores: new Float64Array(size),
+    flags: new Uint8Array(size),
+  }
+  for (let k = 0; k < size; k++) {
+    const head = heads[k] as number
+    const parent = parents[k] as number
+    const flag = flags[k] as number
+    if (!Number.isInteger(head) || head < 0 || head >= cells) return null
+    if (!Number.isInteger(parent) || parent < -1 || parent >= k || (parent === -1 && k !== 0)) return null
+    if (!Number.isInteger(flag) || flag < 0 || flag > 3) return null
+    trace.heads[k] = head
+    trace.parents[k] = parent
+    trace.flags[k] = flag
+    trace.scores[k] = typeof scores[k] === 'number' ? scores[k] : Number.NaN
+  }
+  return trace
 }
