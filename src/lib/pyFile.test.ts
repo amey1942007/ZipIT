@@ -5,11 +5,11 @@ import { validatePy } from '@/lib/pyFile'
 const text = (source: string) => new TextEncoder().encode(source)
 
 describe('validatePy', () => {
-  it('accepts a small utf-8 heuristic and warns when next_move is missing', () => {
+  it('accepts a small utf-8 file and warns when there is no Score or TieBreaker class', () => {
     const ok = validatePy({
-      name: 'heuristic.py',
+      name: 'search.py',
       type: 'text/x-python',
-      bytes: text('def next_move(grid, path, cost_map):\n    return path[-1]\n'),
+      bytes: text('class Score:\n    def score(self, node, board):\n        return 0\n'),
     })
     expect(ok.ok).toBe(true)
     expect(ok.warnings).toEqual([])
@@ -20,7 +20,7 @@ describe('validatePy', () => {
       bytes: text('# just a comment\n'),
     })
     expect(warn.ok).toBe(true)
-    expect(warn.warnings).toEqual(['no def next_move'])
+    expect(warn.warnings).toEqual(['no class Score or TieBreaker'])
   })
 
   it('rejects the wrong extension, a disguised image, and files over 256 KB', () => {
