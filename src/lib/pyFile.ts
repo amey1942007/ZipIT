@@ -71,6 +71,6 @@ export function validatePy(file: ByteFile): PyValidation {
   } catch {
     errors.push('utf8')
   }
-  if (text && !text.includes('def next_move')) warnings.push('no def next_move')
+  if (text && !/^class (Score|TieBreaker)\b/m.test(text)) warnings.push('no class Score or TieBreaker')
   return { ok: errors.length === 0, errors, warnings }
 }

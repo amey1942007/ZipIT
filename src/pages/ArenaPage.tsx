@@ -1,38 +1,51 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import {
+  CHECK_LABELS,
+  CHECK_ORDER,
+  checksPassed,
+  EngineClient,
+  pathSteps,
+  STATUS_LABELS,
+  type CheckResult,
+  type EngineResult,
+  type SubmissionCode,
+} from '@/arena/engine'
 import { frameAt } from '@/arena/playback'
-import { REPLAY_SCORE_LABEL, replayScore } from '@/arena/scoreLocal'
-import type { ReplayPuzzle, ReplayStep } from '@/arena/replayContract'
+import type { ReplayStep } from '@/arena/replayContract'
 import { DEFAULT_GRID, GRID_SIZES, SPEEDS, SPEED_STEPS_PER_S } from '@/config/site'
 import { useCellSize } from '@/components/arena/useCellSize'
 import { ZipBoard } from '@/components/arena/ZipBoard'
 import { ActionButton } from '@/components/comic/ActionButton'
+import { CheckChip } from '@/components/comic/CheckChip'
 import { HudReadout } from '@/components/comic/HudReadout'
 import { Panel } from '@/components/comic/Panel'
 import { Sfx } from '@/components/comic/Sfx'
 import { PageFrame } from '@/components/PageFrame'
 import { useAuth } from '@/lib/auth'
-import { fetchReplay, fetchSubmissions } from '@/lib/data'
-import { loadDemoZip, type DemoZip } from '@/lib/demo'
-import { generatePuzzle } from '@/lib/zip/generate'
-import type { ZipPuzzle } from '@/lib/zip/types'
+import { downloadSubmissionFiles, fetchSubmissions, type SubmissionRow } from '@/lib/data'
+import { formatIst, formatScore } from '@/lib/format'
+import { generatePuzzle, type GeneratedPuzzle } from '@/lib/zip/generate'
 
-type Mode = 'demo' | 'fresh' | 'run'
+/** The Arena keeps the current Zip and the one before it. A third New Zip drops the oldest. */
+const HISTORY_SIZE = 2
 
-function asPuzzle(value: unknown): ReplayPuzzle | null {
-  if (!value || typeof value !== 'object') return null
-  const puzzle = value as ReplayPuzzle
-  if (!Number.isInteger(puzzle.rows) || !Array.isArray(puzzle.waypoints) || !Array.isArray(puzzle.walls)) return null
-  return { ...puzzle, seed: typeof puzzle.seed === 'number' ? puzzle.seed : 0 }
+interface ZipEntry {
+  key: number
+  puzzle: GeneratedPuzzle
+  result: EngineResult | null
+  steps: ReplayStep[]
 }
 
-function asSteps(value: unknown): ReplayStep[] {
-  if (!Array.isArray(value)) return []
-  return value.filter((step): step is ReplayStep => {
-    if (!Array.isArray(step) || step.length < 4) return false
-    const [op, row, col, time] = step
-    return (op === 'm' || op === 'b' || op === 'x') && [row, col, time].every((part) => typeof part === 'number')
-  })
+function chipState(id: (typeof CHECK_ORDER)[number], checks: CheckResult[] | null): 'idle' | 'ok' | 'bad' {
+  const found = checks?.find((item) => item.id === id)
+  if (!found) return 'idle'
+  return found.ok ? 'ok' : 'bad'
+}
+
+function submissionLabel(row: SubmissionRow): string {
+  const score = row.status === 'scored' ? ` · ${formatScore(row.score)}` : ` · ${row.status}`
+  return `${formatIst(row.created_at)}${score}`
 }
 
 export function ArenaPage() {
@@ -42,83 +55,143 @@ export function ArenaPage() {
   const { team, isAdmin } = useAuth()
   const viewedTeam = params.get('team')
   const viewOnly = Boolean(isAdmin && viewedTeam && viewedTeam !== team?.id)
-  const [demo, setDemo] = useState<DemoZip | null>(null)
-  const [mode, setMode] = useState<Mode>(submissionId ? 'run' : 'demo')
-  const [puzzle, setPuzzle] = useState<ZipPuzzle | null>(null)
-  const [steps, setSteps] = useState<ReplayStep[]>([])
+  const teamId = viewedTeam || team?.id || null
+  const [rows, setRows] = useState<SubmissionRow[] | null>(null)
+  const [code, setCode] = useState<SubmissionCode | null>(null)
+  const [checks, setChecks] = useState<CheckResult[] | null>(null)
+  const [history, setHistory] = useState<ZipEntry[]>([])
+  const [showPrevious, setShowPrevious] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1)
   const [grid, setGrid] = useState<number>(DEFAULT_GRID)
   const [note, setNote] = useState('')
-  const [noRuns, setNoRuns] = useState(false)
-  const [missing, setMissing] = useState(false)
   const [boardSlot, setBoardSlot] = useState<HTMLDivElement | null>(null)
-  const cell = useCellSize(puzzle?.cols ?? DEFAULT_GRID, boardSlot)
+  const engine = useRef<EngineClient | null>(null)
+  const keyRef = useRef(0)
+  const loadRef = useRef(0)
+  const gridRef = useRef(grid)
 
   useEffect(() => {
-    let stop = false
-    void loadDemoZip()
-      .then((loaded) => {
-        if (stop) return
-        setDemo(loaded)
-        if (!submissionId) {
-          setPuzzle(loaded.puzzle)
-          setSteps(loaded.steps)
-          setMode('demo')
-          setPlaying(true)
-          setMissing(false)
-        }
-      })
-      .catch(() => {
-        if (!stop && !submissionId) setNote('Could not load the demo Zip.')
-      })
-    return () => {
-      stop = true
-    }
-  }, [submissionId])
+    gridRef.current = grid
+  }, [grid])
 
-  useEffect(() => {
-    if (!submissionId) return
-    let stop = false
+  const selected = useMemo(() => {
+    if (!rows || rows.length === 0) return null
+    return rows.find((row) => row.id === submissionId) ?? (submissionId ? null : rows[0]!)
+  }, [rows, submissionId])
+  const missing = Boolean(rows && submissionId && !selected)
+  const [shownId, setShownId] = useState<string | null>(null)
+  if ((selected?.id ?? null) !== shownId) {
+    setShownId(selected?.id ?? null)
+    setCode(null)
+    setChecks(null)
+    setHistory([])
+    setShowPrevious(false)
     setPlaying(false)
-    setMode('run')
-    setMissing(false)
-    setPuzzle(null)
-    void fetchReplay(submissionId).then((row) => {
-      if (stop) return
-      const nextPuzzle = asPuzzle(row?.puzzle)
-      const nextSteps = asSteps(row?.steps)
-      if (!row || !nextPuzzle) {
-        setPuzzle(null)
-        setSteps([])
-        setMissing(true)
-        setNote('')
-        return
-      }
-      setPuzzle(nextPuzzle)
-      setSteps(nextSteps)
-      setIndex(0)
-      setPlaying(nextSteps.length > 0)
-      setMissing(false)
-      setNote('')
-    })
-    return () => {
-      stop = true
-    }
-  }, [submissionId])
+    if (selected) setNote('Loading the submission…')
+  }
+
+  const entry = showPrevious && history.length >= 2 ? history[history.length - 2]! : history[history.length - 1] ?? null
+  const puzzle = entry?.puzzle ?? null
+  const steps = useMemo(() => entry?.steps ?? [], [entry])
+  const cell = useCellSize(puzzle?.cols ?? grid, boardSlot)
 
   useEffect(() => {
-    const teamId = viewedTeam || team?.id
+    const client = new EngineClient()
+    engine.current = client
+    return () => client.dispose()
+  }, [])
+
+  useEffect(() => {
     if (!teamId) return
     let stop = false
-    void fetchSubmissions(teamId).then((rows) => {
-      if (!stop) setNoRuns(rows.length === 0)
-    })
+    void fetchSubmissions(teamId)
+      .then((list) => {
+        if (!stop) setRows(list)
+      })
+      .catch(() => {
+        if (!stop) {
+          setRows([])
+          setNote('Could not load submissions.')
+        }
+      })
     return () => {
       stop = true
     }
-  }, [team?.id, viewedTeam])
+  }, [teamId])
+
+  const runOn = useCallback(async (source: SubmissionCode, size: number) => {
+    const client = engine.current
+    if (!client) return
+    let generated: GeneratedPuzzle
+    try {
+      generated = generatePuzzle({ seed: Date.now() >>> 0, rows: size, cols: size, timeBudgetMs: 2500 })
+    } catch (error) {
+      setNote(error instanceof Error ? error.message : 'Could not generate a Zip.')
+      return
+    }
+    const key = ++keyRef.current
+    setHistory((list) => [...list, { key, puzzle: generated, result: null, steps: [] }].slice(-HISTORY_SIZE))
+    setShowPrevious(false)
+    setIndex(0)
+    setPlaying(false)
+    setBusy(true)
+    setNote('Running your code on this Zip…')
+    const reply = await client.run(source, generated)
+    setBusy(false)
+    if (reply.checks.length) setChecks(reply.checks)
+    if (reply.error) {
+      setNote(reply.error)
+      return
+    }
+    const result = reply.result
+    if (!result) {
+      setNote('Fix the failed check before running.')
+      return
+    }
+    const nextSteps = pathSteps(result.path, generated.cols)
+    setHistory((list) => list.map((item) => (item.key === key ? { ...item, result, steps: nextSteps } : item)))
+    setIndex(0)
+    setPlaying(nextSteps.length > 0)
+    setNote(result.solved ? '' : 'Showing the deepest path the search reached.')
+  }, [])
+
+  useEffect(() => {
+    if (!selected) return
+    const load = ++loadRef.current
+    let stop = false
+    void downloadSubmissionFiles(selected)
+      .then(async (files) => {
+        if (stop || load !== loadRef.current) return
+        setCode(files)
+        setBusy(true)
+        setNote('Starting Python and checking your code…')
+        const reply = await engine.current?.check(files)
+        if (stop || load !== loadRef.current || !reply) return
+        setBusy(false)
+        setChecks(reply.checks)
+        if (reply.error) {
+          setNote(reply.error)
+          return
+        }
+        if (!checksPassed(reply.checks)) {
+          setNote('')
+          return
+        }
+        await runOn(files, gridRef.current)
+      })
+      .catch(() => {
+        if (!stop) {
+          setBusy(false)
+          setNote('Could not download this submission.')
+        }
+      })
+    return () => {
+      stop = true
+    }
+  }, [selected, runOn])
 
   useEffect(() => {
     if (!playing || steps.length === 0) return
@@ -134,162 +207,175 @@ export function ArenaPage() {
     return () => window.clearInterval(timer)
   }, [playing, speed, steps.length])
 
-  const frame = useMemo(() => {
-    if (!puzzle) return null
-    return frameAt({ ...puzzle, seed: 'seed' in puzzle ? Number(puzzle.seed) || 0 : 0 }, steps, index)
-  }, [puzzle, steps, index])
+  const frame = useMemo(() => (puzzle ? frameAt(puzzle, steps, index) : null), [puzzle, steps, index])
 
-  function showDemo() {
-    if (!demo) return
-    setMode('demo')
-    setPuzzle(demo.puzzle)
-    setSteps(demo.steps)
-    setIndex(0)
-    setPlaying(true)
-    setNote('')
-    setMissing(false)
-    navigate('/arena')
+  function pick(id: string) {
+    const query = viewedTeam ? `?team=${encodeURIComponent(viewedTeam)}` : ''
+    navigate(`/arena/${id}${query}`)
   }
 
   function newZip() {
-    try {
-      const generated = generatePuzzle({
-        seed: Date.now() >>> 0,
-        rows: grid,
-        cols: grid,
-        timeBudgetMs: 2500,
-      })
-      setMode('fresh')
-      setPuzzle(generated)
-      setSteps([])
-      setIndex(0)
-      setPlaying(false)
-      setMissing(false)
-      setNote('This Zip has no solution loaded. Playback stays off.')
-      navigate('/arena')
-    } catch (error) {
-      setNote(error instanceof Error ? error.message : 'Could not generate a Zip.')
-    }
+    if (code && checksPassed(checks)) void runOn(code, grid)
   }
 
-  const playbackOff = mode === 'fresh' || steps.length === 0
-  const solved = Boolean(
-    frame && puzzle && frame.path.length === puzzle.rows * puzzle.cols && frame.waypointsReached === puzzle.waypoints.length,
-  )
-  const modeLabel = viewOnly ? `VIEW ONLY · ${viewedTeam}` : mode === 'demo' ? 'DEMO' : mode === 'fresh' ? 'FRESH' : 'REPLAY'
-  const depth = frame?.maxDepth ?? 0
-  const score = mode === 'fresh' || !puzzle ? null : replayScore(depth, puzzle.rows, puzzle.cols)
+  const result = entry?.result ?? null
+  const playbackOff = steps.length === 0 || busy
+  const solved = Boolean(result?.solved && frame && puzzle && frame.path.length === puzzle.rows * puzzle.cols)
+  const failed = checks?.find((item) => !item.ok) ?? null
+  const modeLabel = viewOnly ? `VIEW ONLY · ${viewedTeam}` : 'RUN'
+  const stats = result?.stats ?? {}
+  const total = puzzle ? puzzle.rows * puzzle.cols : 0
 
   return (
     <PageFrame title="Arena">
-      {noRuns ? <p className="rounded-xl border border-border bg-surface px-4 py-3">No runs yet</p> : null}
+      {rows && rows.length === 0 ? (
+        <p className="rounded-xl border border-border bg-surface px-4 py-3">
+          No submissions yet.{' '}
+          <Link to="/submissions" className="font-semibold text-gold">
+            Upload search.py and tiebreaker.py
+          </Link>{' '}
+          to run them here.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <HudReadout>{modeLabel}</HudReadout>
         <span className="rounded-full border border-gold px-3 py-1 font-display text-xs font-semibold tracking-[0.12em] text-gold">
-          {mode === 'demo' ? 'Demo Zip with solution' : mode === 'fresh' ? 'New Zip' : 'Saved run'}
+          {showPrevious ? 'Previous Zip' : 'Latest Zip'}
         </span>
-        {mode === 'demo' ? (
+        {selected ? (
           <span className="rounded-full bg-gold px-3 py-1 font-display text-xs font-semibold tracking-[0.12em] text-on-gold">
-            Demo solution
+            {submissionLabel(selected)}
           </span>
         ) : null}
       </div>
       {note ? <p className="text-text-muted">{note}</p> : null}
       <div className="zi-arena">
         <div className="zi-arena-board">
-        {missing ? (
-          <p className="text-text-muted">
-            Run not found.{' '}
-            <Link to="/arena" className="font-semibold text-gold">
-              Back to the Arena demo
-            </Link>
-          </p>
-        ) : puzzle && frame ? (
-          <Panel fill="maroon" className="relative p-4 sm:p-6">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <HudReadout>{modeLabel}</HudReadout>
-              {Array.from({ length: Math.min(3, frame.waypointsReached) }, (_, index) => (
-                <HudReadout key={index}>{`NODE 0${frame.waypointsReached - index} · STEP ${index}`}</HudReadout>
-              ))}
-            </div>
-            <div ref={setBoardSlot} className="zi-arena-square">
-              <ZipBoard
-                puzzle={puzzle}
-                path={mode === 'fresh' ? [] : frame.path}
-                backtracked={mode === 'fresh' ? [] : frame.backtracked}
-                head={frame.head}
-                cell={cell}
-                showLine={mode !== 'fresh'}
-                playing={playing && mode !== 'fresh'}
-              />
-            </div>
-            {solved ? (
-              <span className="pointer-events-none absolute top-3 right-3">
-                <Sfx preset="arena" stamp label="ZIP IT!" />
-              </span>
-            ) : null}
-            {solved ? <p className="sr-only">Path complete. Every cell visited.</p> : null}
-          </Panel>
-        ) : (
-          <p className="text-text-muted">Loading the board…</p>
-        )}
+          {missing ? (
+            <p className="text-text-muted">
+              Run not found.{' '}
+              <Link to="/arena" className="font-semibold text-gold">
+                Back to the Arena
+              </Link>
+            </p>
+          ) : puzzle && frame ? (
+            <Panel fill="maroon" className="relative p-4 sm:p-6">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <HudReadout>{modeLabel}</HudReadout>
+                {Array.from({ length: Math.min(3, frame.waypointsReached) }, (_, i) => (
+                  <HudReadout key={i}>{`NODE 0${frame.waypointsReached - i} · STEP ${i}`}</HudReadout>
+                ))}
+              </div>
+              <div ref={setBoardSlot} className="zi-arena-square">
+                <ZipBoard
+                  puzzle={puzzle}
+                  path={frame.path}
+                  backtracked={frame.backtracked}
+                  head={frame.head}
+                  cell={cell}
+                  showLine={steps.length > 0}
+                  playing={playing}
+                />
+              </div>
+              {solved ? (
+                <span className="pointer-events-none absolute top-3 right-3">
+                  <Sfx preset="arena" stamp label="ZIP IT!" />
+                </span>
+              ) : null}
+              {solved ? <p className="sr-only">Path complete. Every cell visited.</p> : null}
+            </Panel>
+          ) : (
+            <p className="text-text-muted">
+              {rows === null ? 'Loading the board…' : selected ? 'Waiting for the checks…' : 'Pick a submission to run.'}
+            </p>
+          )}
         </div>
         <Panel fill="plain" className="zi-arena-play min-w-0">
-        <div className="grid gap-4 p-4">
-          <HudReadout>PLAYBACK</HudReadout>
-          <p className="font-mono font-bold text-text-muted tabular-nums">
-            {REPLAY_SCORE_LABEL}: {score == null ? '—' : score}
-          </p>
-          {mode === 'demo' ? <p className="text-sm text-text-muted">Official score is hidden on the demo.</p> : null}
-          <div className="flex flex-wrap gap-2">
-            <ActionButton type="button" disabled={playbackOff} onClick={() => setPlaying((value) => !value)}>
-              {playing ? 'Pause' : 'Play'}
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              type="button"
-              disabled={playbackOff}
-              onClick={() => {
-                setPlaying(false)
-                setIndex((value) => Math.max(0, value - 1))
-              }}
-            >
-              Step back
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              type="button"
-              disabled={playbackOff}
-              onClick={() => {
-                setPlaying(false)
-                setIndex((value) => Math.min(steps.length, value + 1))
-              }}
-            >
-              Step forward
-            </ActionButton>
-          </div>
-          <label className="grid gap-2 text-sm text-ivory-muted">
-            Seek
-            <input
-              type="range"
-              min={0}
-              max={Math.max(steps.length, 0)}
-              value={Math.min(index, steps.length)}
-              disabled={playbackOff}
-              onChange={(event) => {
-                setPlaying(false)
-                setIndex(Number(event.target.value))
-              }}
-            />
-          </label>
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Playback speed">
-            {SPEEDS.map((value) => (
-              <ActionButton key={value} type="button" variant={value === speed ? 'primary' : 'ghost'} disabled={playbackOff} onClick={() => setSpeed(value)}>
-                {value}×
+          <div className="grid gap-4 p-4">
+            <HudReadout>SUBMISSION</HudReadout>
+            {rows && rows.length > 0 ? (
+              <label className="grid gap-1 text-sm">
+                Run
+                <select
+                  className="h-11 rounded border-2 border-[rgba(255,246,232,.6)] bg-comic-maroon px-3 text-ivory"
+                  value={selected?.id ?? ''}
+                  disabled={busy}
+                  onChange={(event) => pick(event.target.value)}
+                >
+                  {rows.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {submissionLabel(row)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {CHECK_ORDER.map((id, i) => (
+                <CheckChip key={id} label={CHECK_LABELS[id]} state={chipState(id, checks)} delay={i * 120} />
+              ))}
+            </div>
+            {failed ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{failed.message}</p> : null}
+            <HudReadout>PLAYBACK</HudReadout>
+            <div className="grid gap-1 font-mono text-sm font-bold text-text-muted tabular-nums">
+              <p>Status: {busy ? 'Running…' : result ? STATUS_LABELS[result.status] : '—'}</p>
+              <p>
+                Path: {frame ? frame.path.length : 0}/{total || '—'} cells
+              </p>
+              <p>Expansions: {stats.expansions ?? '—'}</p>
+              <p>Backtracks: {stats.backtracks ?? '—'}</p>
+              <p>Time: {typeof stats.elapsed === 'number' ? `${stats.elapsed.toFixed(2)} s` : '—'}</p>
+            </div>
+            {result?.error ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{result.error}</p> : null}
+            <p className="text-sm text-text-muted">Arena runs are practice only. Official scores come from the scorer.</p>
+            <div className="flex flex-wrap gap-2">
+              <ActionButton type="button" disabled={playbackOff} onClick={() => setPlaying((value) => !value)}>
+                {playing ? 'Pause' : 'Play'}
               </ActionButton>
-            ))}
-          </div>
-          {viewOnly ? null : (
+              <ActionButton
+                variant="ghost"
+                type="button"
+                disabled={playbackOff}
+                onClick={() => {
+                  setPlaying(false)
+                  setIndex((value) => Math.max(0, value - 1))
+                }}
+              >
+                Step back
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                type="button"
+                disabled={playbackOff}
+                onClick={() => {
+                  setPlaying(false)
+                  setIndex((value) => Math.min(steps.length, value + 1))
+                }}
+              >
+                Step forward
+              </ActionButton>
+            </div>
+            <label className="grid gap-2 text-sm text-ivory-muted">
+              Seek
+              <input
+                type="range"
+                min={0}
+                max={Math.max(steps.length, 0)}
+                value={Math.min(index, steps.length)}
+                disabled={playbackOff}
+                onChange={(event) => {
+                  setPlaying(false)
+                  setIndex(Number(event.target.value))
+                }}
+              />
+            </label>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Playback speed">
+              {SPEEDS.map((value) => (
+                <ActionButton key={value} type="button" variant={value === speed ? 'primary' : 'ghost'} disabled={playbackOff} onClick={() => setSpeed(value)}>
+                  {value}×
+                </ActionButton>
+              ))}
+            </div>
             <div className="flex flex-wrap items-end gap-3">
               <label className="grid gap-1 text-sm">
                 Grid
@@ -305,15 +391,23 @@ export function ArenaPage() {
                   ))}
                 </select>
               </label>
-              <ActionButton type="button" onClick={newZip}>
+              <ActionButton type="button" onClick={newZip} disabled={busy || !code || !checksPassed(checks)}>
                 New Zip
               </ActionButton>
-              <ActionButton type="button" variant="ghost" onClick={showDemo} disabled={!demo}>
-                Previous Zip
+              <ActionButton
+                type="button"
+                variant="ghost"
+                disabled={busy || history.length < 2}
+                onClick={() => {
+                  setShowPrevious((value) => !value)
+                  setIndex(0)
+                  setPlaying(true)
+                }}
+              >
+                {showPrevious ? 'Latest Zip' : 'Previous Zip'}
               </ActionButton>
             </div>
-          )}
-        </div>
+          </div>
         </Panel>
       </div>
     </PageFrame>

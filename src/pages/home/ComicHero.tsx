@@ -156,7 +156,7 @@ export function ComicHero() {
             <div className="grid h-full content-center gap-3 p-4">
               <HudReadout>YOUR HEURISTIC</HudReadout>
               <Balloon>
-                <pre className="font-mono text-[15px] leading-relaxed text-ink">{`def next_move(grid, path, cost_map):\n    # return the next (r, c)\n    return best`}</pre>
+                <pre className="font-mono text-[15px] leading-relaxed text-ink">{`class Score:\n    def score(self, node, board):\n        return -next_manhattan(node, board)`}</pre>
               </Balloon>
             </div>
           </Panel>
