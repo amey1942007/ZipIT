@@ -6,7 +6,8 @@ import gameSource from '@/workers/zipcomp/game.py?raw'
 import helpersInitSource from '@/workers/zipcomp/helpers_init.py?raw'
 import helpersPrimitivesSource from '@/workers/zipcomp/helpers_primitives.py?raw'
 import { SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE } from '@/playground/templates'
-import { puzzleToBoard } from '@/arena/engineCore'
+import { asTrace, puzzleToBoard, TRACE_TIE } from '@/arena/engineCore'
+import { indexTrace, nodePath } from '@/arena/trace'
 import {
   BOARD_REFERENCE,
   EXAMPLE_PATH,
@@ -227,6 +228,37 @@ json.dumps(_out)
       expect(doc.source.startsWith(`def ${doc.name}(`)).toBe(true)
       expect(doc.signature.startsWith(`${doc.name}(`)).toBe(true)
     }
+  })
+
+  it('logs every expansion so the Arena can replay the whole search', () => {
+    expect(check(SEARCH, TIEBREAKER).every((item) => item.ok)).toBe(true)
+    for (const sample of PARITY) {
+      const cells = sample.board.width * sample.board.height
+      py.globals.set('_BOARD_JSON', JSON.stringify(sample.board))
+      const result = JSON.parse(String(py.runPython('_run(_BOARD_JSON, 200000, 60)')))
+      const trace = asTrace(result.trace, cells)
+      expect(trace).not.toBeNull()
+      const index = indexTrace(trace!)
+      expect(index.size).toBe(sample.expansions)
+      expect(index.totalBacktracks).toBe(sample.backtracks)
+      expect(trace!.flags.filter((flag) => flag & TRACE_TIE).length).toBe(result.stats.tiebreaks)
+      const solution = (result.path as number[][]).map(([r, c]) => r! * sample.board.width + c!)
+      expect(nodePath(trace!, index.size - 1)).toEqual(solution)
+      expect(Number.isFinite(trace!.scores[index.size - 1])).toBe(true)
+    }
+  }, 120_000)
+
+  it('shows a run that hits the expansion limit step by step', () => {
+    expect(check(SEARCH, TIEBREAKER).every((item) => item.ok)).toBe(true)
+    const sample = PARITY[1]!
+    py.globals.set('_BOARD_JSON', JSON.stringify(sample.board))
+    const result = JSON.parse(String(py.runPython('_run(_BOARD_JSON, 300, 60)')))
+    expect(result.status).toBe('expansion_limit')
+    const trace = asTrace(result.trace, sample.board.width * sample.board.height)
+    const index = indexTrace(trace!)
+    expect(index.size).toBe(300)
+    expect(index.totalBacktracks).toBe(result.stats.backtracks)
+    expect(index.totalBacktracks).toBeGreaterThan(0)
   })
 
   it('matches CPython expansion counts on the same boards', () => {

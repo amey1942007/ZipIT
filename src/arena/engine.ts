@@ -129,7 +129,14 @@ export class EngineClient {
     if (reply.type === 'timeout') {
       return {
         checks: [],
-        result: { status: 'timeout', error: 'The run took too long and was stopped.', path: [], solved: false, stats: {} },
+        result: {
+          status: 'timeout',
+          error: 'The run took too long and was stopped.',
+          path: [],
+          solved: false,
+          stats: {},
+          trace: null,
+        },
         error: null,
       }
     }

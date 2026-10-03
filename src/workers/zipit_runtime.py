@@ -282,18 +282,42 @@ def _check(search_src, tiebreaker_src):
     return json.dumps(out)
 
 
-class _Deepest:
-    """Recorder hook: remembers the deepest expanded node for unsolved runs."""
+def _finite(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+class _Trace:
+    """Recorder hook: logs every expansion in order and remembers the deepest node.
+
+    Expansion k is the node with eid k. parents[k] is the eid of the node it grew from
+    (-1 for the start), so the Arena can rebuild any expanded path. flags: 1 = the
+    tie-breaker decided this pop, 2 = the engine counted it as a backtrack.
+    """
 
     def __init__(self):
         self.node = None
+        self.heads = []
+        self.parents = []
+        self.scores = []
+        self.flags = []
 
     def expand(self, node, score, tie, backtrack):
         if self.node is None or node.depth > self.node.depth:
             self.node = node
+        self.heads.append(node.head)
+        self.parents.append(node.parent.eid if node.parent is not None else -1)
+        self.scores.append(_finite(score))
+        self.flags.append((1 if tie else 0) | (2 if backtrack else 0))
 
     def finish(self, status, solution, stats):
         pass
+
+    def as_dict(self):
+        return {"heads": self.heads, "parents": self.parents, "scores": self.scores, "flags": self.flags}
 
 
 def _run(board_json, max_expansions, time_limit):
@@ -303,20 +327,27 @@ def _run(board_json, max_expansions, time_limit):
     if _scorer is None or _tiebreaker is None:
         return json.dumps({"status": "error", "error": "Run the checks first.", "path": [], "stats": {}})
     board = Board.from_dict(json.loads(board_json))
-    deepest = _Deepest()
+    trace = _Trace()
     try:
-        stats = best_score_search(board, _scorer, _tiebreaker, int(max_expansions), float(time_limit), recorder=deepest)
+        stats = best_score_search(board, _scorer, _tiebreaker, int(max_expansions), float(time_limit), recorder=trace)
     except Exception as exc:
         line = _line_of(exc, "search.py")
         where = _where(exc, "search.py") if line else _where(exc, "tiebreaker.py")
-        path = deepest.node.path if deepest.node is not None else []
-        return json.dumps({"status": "error", "error": where, "path": [list(board.rc(c)) for c in path], "stats": {}})
+        path = trace.node.path if trace.node is not None else []
+        return json.dumps({
+            "status": "error",
+            "error": where,
+            "path": [list(board.rc(c)) for c in path],
+            "stats": {},
+            "trace": trace.as_dict(),
+        })
     solution = stats.get("solution")
-    path = solution if solution else (deepest.node.path if deepest.node is not None else [])
+    path = solution if solution else (trace.node.path if trace.node is not None else [])
     clean = {k: v for k, v in stats.items() if k != "solution"}
     return json.dumps({
         "status": stats["status"],
         "error": None,
         "path": [list(board.rc(c)) for c in path],
         "stats": clean,
+        "trace": trace.as_dict(),
     })
