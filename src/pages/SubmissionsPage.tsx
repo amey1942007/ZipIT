@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
+import { CHECK_LABELS, checksPassed, EngineClient } from '@/arena/engine'
 import { PageFrame } from '@/components/PageFrame'
 import { ActionButton } from '@/components/comic/ActionButton'
 import { Balloon } from '@/components/comic/Balloon'
@@ -13,13 +14,17 @@ import { QUEUE_CAP } from '@/config/site'
 import { fetchQueueDepth, fetchSubmissions, uploadSubmission, withdrawSubmission, type SubmissionRow } from '@/lib/data'
 import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore, metricsLine } from '@/lib/format'
 import { buildSlots, slotStatusText } from '@/lib/slots'
-import { pairFiles, uploadCheckList } from '@/lib/uploadChecks'
+import { pairFiles, SEARCH_FILE, TIEBREAKER_FILE, uploadCheckList } from '@/lib/uploadChecks'
 import { playZipped } from '@/lib/sfx'
 import { clearStaged, readStaged, STAGED_DRAG_TYPE, stagedFiles, type StagedSubmission } from '@/lib/stagedSubmission'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useSubmissionFeed } from '@/lib/useLive'
+import { isUnchanged } from '@/playground/templates'
 
 const QUEUE_POLL_MS = 15_000
+const CHIP_LABELS = ['Two files', 'search.py + tiebreaker.py', 'Not empty', '≤ 256 KB each', 'Code checks', 'Uploaded', 'Queued']
+/** Chips decided before upload: the four file checks plus the Python code checks. */
+const PRE_UPLOAD_CHIPS = 5
 
 export function SubmissionsPage() {
   const { team, isAdmin } = useAuth()
@@ -27,7 +32,8 @@ export function SubmissionsPage() {
   const [message, setMessage] = useState('')
   const [outcome, setOutcome] = useState<'ok' | 'error' | null>(null)
   const [checks, setChecks] = useState<boolean[] | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [phase, setPhase] = useState<'checking' | 'uploading' | null>(null)
+  const busy = phase !== null
   const [over, setOver] = useState(false)
   const [preview, setPreview] = useState<string[]>([])
   const [staged, setStaged] = useState<StagedSubmission | null>(() => readStaged())
@@ -35,6 +41,13 @@ export function SubmissionsPage() {
   const [withdrawing, setWithdrawing] = useState<string | null>(null)
   const [listNote, setListNote] = useState<{ text: string; error: boolean } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const engine = useRef<EngineClient | null>(null)
+
+  useEffect(() => {
+    const client = new EngineClient()
+    engine.current = client
+    return () => client.dispose()
+  }, [])
 
   const refreshQueue = useCallback(() => {
     void fetchQueueDepth().then(setQueue)
@@ -59,7 +72,7 @@ export function SubmissionsPage() {
   useSubmissionFeed(team?.id ?? null, reload)
 
   async function take(list: File[], source: 'upload' | 'playground' = 'upload') {
-    if (!team && isSupabaseConfigured) return
+    if (busy || (!team && isSupabaseConfigured)) return
     if (isAdmin) {
       setChecks(null)
       setPreview([])
@@ -68,7 +81,8 @@ export function SubmissionsPage() {
       return
     }
     const report = uploadCheckList(list.map((item) => ({ name: item.name, size: item.size })))
-    setChecks(report.map((item) => item.ok))
+    const fileChecks = report.map((item) => item.ok)
+    setChecks(fileChecks)
     const problem = report.find((item) => !item.ok)?.message ?? null
     const pair = pairFiles(list)
     if (problem || !pair) {
@@ -77,20 +91,61 @@ export function SubmissionsPage() {
       setPreview([])
       return
     }
-    setBusy(true)
+    const client = engine.current
+    if (!client) return
+    setPhase('checking')
     setOutcome(null)
     setMessage('')
-    void pair.search
-      .text()
-      .then((text) => setPreview(text.split('\n').slice(0, 10).map((line) => line.slice(0, 90))))
-      .catch(() => setPreview([]))
-    if (!isSupabaseConfigured || !team) {
-      setOutcome('ok')
-      setMessage('Preview only. Nothing was uploaded.')
-      playZipped()
-      setBusy(false)
+    const rejectCode = (text: string) => {
+      setChecks([...fileChecks, false])
+      setOutcome('error')
+      setMessage(text)
+      setPhase(null)
+    }
+    let code: { search: string; tiebreaker: string }
+    try {
+      const [search, tiebreaker] = await Promise.all([pair.search.text(), pair.tiebreaker.text()])
+      code = { search, tiebreaker }
+    } catch {
+      rejectCode("Couldn't read the files. Pick them again.")
       return
     }
+    setPreview(code.search.split('\n').slice(0, 10).map((line) => line.slice(0, 90)))
+    const untouched = (
+      [
+        [SEARCH_FILE, code.search],
+        [TIEBREAKER_FILE, code.tiebreaker],
+      ] as const
+    )
+      .filter(([name, text]) => isUnchanged(name, text))
+      .map(([name]) => name)
+    if (untouched.length) {
+      rejectCode(`${untouched.join(' and ')} ${untouched.length > 1 ? 'are' : 'is'} still the starter template. Write your own code first.`)
+      return
+    }
+    const reply = await client.check(code)
+    if (reply.error) {
+      rejectCode(`Couldn't check your code: ${reply.error}`)
+      return
+    }
+    if (!checksPassed(reply.checks)) {
+      const failed = reply.checks.find((item) => !item.ok)
+      rejectCode(
+        failed
+          ? `${CHECK_LABELS[failed.id]} check failed: ${failed.message.replace(/\.?\s*$/, '.')} Nothing was uploaded.`
+          : 'The code checks did not finish. Nothing was uploaded.',
+      )
+      return
+    }
+    setChecks([...fileChecks, true])
+    if (!isSupabaseConfigured || !team) {
+      setOutcome('ok')
+      setMessage('Preview only. Code checks passed, nothing was uploaded.')
+      playZipped()
+      setPhase(null)
+      return
+    }
+    setPhase('uploading')
     try {
       await uploadSubmission(team.id, pair, source)
       setOutcome('ok')
@@ -106,7 +161,7 @@ export function SubmissionsPage() {
       setMessage(error instanceof Error ? error.message : 'Upload failed. Check your connection and try again.')
       refreshQueue()
     } finally {
-      setBusy(false)
+      setPhase(null)
     }
   }
 
@@ -148,7 +203,7 @@ export function SubmissionsPage() {
           <div className="grid gap-4 p-5 text-ink">
             <HudReadout>YOUR FILES · PANEL 1/2</HudReadout>
             <ul className="grid gap-1 bg-ivory text-[15px] font-medium">
-              <li>Two files: search.py and tiebreaker.py</li>
+              <li>Two files, named exactly search.py and tiebreaker.py</li>
               <li>Up to 256 KB each</li>
               <li>search.py: class Score with score(self, node, board). Higher scores expand first.</li>
               <li>tiebreaker.py: class TieBreaker with key(self, node, board). The greater key wins a tie.</li>
@@ -204,7 +259,7 @@ export function SubmissionsPage() {
                   event.target.value = ''
                 }}
               />
-              {busy ? 'Uploading…' : 'Choose files'}
+              {phase === 'checking' ? 'Checking…' : phase === 'uploading' ? 'Uploading…' : 'Choose files'}
             </label>
             <Balloon>
               <p>{staged ? 'Drag your Playground files into the big panel →' : 'Drop both files in the big panel →'}</p>
@@ -242,10 +297,15 @@ export function SubmissionsPage() {
               <p className="mt-2 font-mono text-[13px] text-ivory-muted">or use Choose files · search.py + tiebreaker.py · up to 256 KB each</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['Two files', 'search.py + tiebreaker.py', 'Not empty', '≤ 256 KB each', 'Uploaded', 'Queued'].map((label, index) => (
+              {CHIP_LABELS.map((label, index) => (
                 <CheckChip key={label} label={label} state={chipState(index, checks, outcome)} delay={index * 120} />
               ))}
             </div>
+            {phase === 'checking' ? (
+              <p role="status" className="font-mono text-sm text-ivory-muted">
+                Checking your code before it joins the queue. The first check starts Python and can take a few seconds.
+              </p>
+            ) : null}
             {outcome === 'ok' ? (
               <>
                 <StampOverlay>
@@ -358,14 +418,14 @@ export function SubmissionsPage() {
 function chipState(index: number, checks: boolean[] | null, outcome: 'ok' | 'error' | null): 'idle' | 'ok' | 'bad' {
   if (!checks) return 'idle'
   const firstBad = checks.findIndex((ok) => !ok)
-  if (index < 4) {
-    if (firstBad === -1) return 'ok'
-    if (index < firstBad) return 'ok'
+  if (index < PRE_UPLOAD_CHIPS) {
+    if (index >= checks.length) return 'idle'
+    if (firstBad === -1 || index < firstBad) return 'ok'
     if (index === firstBad) return 'bad'
     return 'idle'
   }
-  if (firstBad !== -1) return 'idle'
+  if (firstBad !== -1 || checks.length < PRE_UPLOAD_CHIPS) return 'idle'
   if (outcome === 'ok') return 'ok'
-  if (outcome === 'error' && index === 4) return 'bad'
+  if (outcome === 'error' && index === PRE_UPLOAD_CHIPS) return 'bad'
   return 'idle'
 }
