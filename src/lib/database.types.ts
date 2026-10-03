@@ -103,6 +103,54 @@ export type Database = {
           },
         ]
       }
+      arena_replays: {
+        Row: {
+          created_at: string
+          id: string
+          puzzle: Json
+          slot: string
+          submission_id: string
+          summary: Json
+          team_id: string
+          trace_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          puzzle: Json
+          slot: string
+          submission_id: string
+          summary: Json
+          team_id: string
+          trace_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          puzzle?: Json
+          slot?: string
+          submission_id?: string
+          summary?: Json
+          team_id?: string
+          trace_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_replays_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arena_replays_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       replays: {
         Row: {
           created_at: string
@@ -274,6 +322,17 @@ export type Database = {
       own_submission_file_exists: { Args: { p_path: string }; Returns: boolean }
       prune_submissions: { Args: { p_team: string }; Returns: undefined }
       refresh_leaderboard: { Args: never; Returns: undefined }
+      replay_upload_allowed: { Args: { p_name: string }; Returns: boolean }
+      save_arena_replay: {
+        Args: {
+          p_keep: string[]
+          p_path: string
+          p_puzzle: Json
+          p_submission: string
+          p_summary: Json
+        }
+        Returns: undefined
+      }
       scoring_queue_depth: { Args: never; Returns: number }
       submission_orphan_files: {
         Args: { p_limit?: number }

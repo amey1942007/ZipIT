@@ -1,11 +1,10 @@
 import {
   asChecks,
   asResult,
-  ENGINE_HARD_TIMEOUT_MS,
-  ENGINE_MAX_EXPANSIONS,
-  ENGINE_TIME_LIMIT_S,
+  GRADING_LIMITS,
   puzzleToBoard,
   type CheckResult,
+  type EngineLimits,
   type EngineResult,
   type SubmissionCode,
 } from '@/arena/engineCore'
@@ -18,7 +17,7 @@ export * from '@/arena/engineCore'
 
 const CHECK_TIMEOUT_MS = 20_000
 
-type Reply = { type: string; checks?: unknown; result?: unknown; error?: string }
+type Reply = { type: string; checks?: unknown; result?: unknown; trace?: unknown; error?: string }
 
 interface Pending {
   resolve: (data: Reply) => void
@@ -112,19 +111,25 @@ export class EngineClient {
   async run(
     code: SubmissionCode,
     puzzle: ZipPuzzle,
+    limits: EngineLimits = GRADING_LIMITS,
   ): Promise<{ checks: CheckResult[]; result: EngineResult | null; error: string | null }> {
     const reply = await this.send(
       {
         type: 'run',
         ...code,
         board: puzzleToBoard(puzzle),
-        maxExpansions: ENGINE_MAX_EXPANSIONS,
-        timeLimit: ENGINE_TIME_LIMIT_S,
+        maxExpansions: limits.maxExpansions,
+        timeLimit: limits.timeLimitS,
       },
-      ENGINE_HARD_TIMEOUT_MS,
+      limits.hardTimeoutMs,
     )
     if (reply.type === 'ran') {
-      return { checks: asChecks(reply.checks), result: reply.result ? asResult(reply.result, puzzle) : null, error: null }
+      const traceBytes = reply.trace instanceof Uint8Array ? reply.trace : null
+      return {
+        checks: asChecks(reply.checks),
+        result: reply.result ? asResult(reply.result, puzzle, traceBytes) : null,
+        error: null,
+      }
     }
     if (reply.type === 'timeout') {
       return {
@@ -136,6 +141,7 @@ export class EngineClient {
           solved: false,
           stats: {},
           trace: null,
+          traceBytes: null,
         },
         error: null,
       }
