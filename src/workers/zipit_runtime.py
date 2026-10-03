@@ -8,10 +8,12 @@ in-memory filesystem by ``_install_engine`` so submissions import them exactly a
 the Mac mini: ``from helpers import next_manhattan``.
 """
 
+import array
 import ast
 import json
 import math
 import os
+import struct
 import sys
 import types
 
@@ -286,8 +288,12 @@ def _finite(value):
     try:
         number = float(value)
     except (TypeError, ValueError, OverflowError):
-        return None
-    return number if math.isfinite(number) else None
+        return math.nan
+    return number if math.isfinite(number) else math.nan
+
+
+def _pad(out, align):
+    out.extend(b"\0" * (-len(out) % align))
 
 
 class _Trace:
@@ -296,14 +302,15 @@ class _Trace:
     Expansion k is the node with eid k. parents[k] is the eid of the node it grew from
     (-1 for the start), so the Arena can rebuild any expanded path. flags: 1 = the
     tie-breaker decided this pop, 2 = the engine counted it as a backtrack.
+    Typed arrays keep a million expansions at about 15 MB.
     """
 
     def __init__(self):
         self.node = None
-        self.heads = []
-        self.parents = []
-        self.scores = []
-        self.flags = []
+        self.heads = array.array("H")
+        self.parents = array.array("i")
+        self.scores = array.array("d")
+        self.flags = array.array("B")
 
     def expand(self, node, score, tie, backtrack):
         if self.node is None or node.depth > self.node.depth:
@@ -316,14 +323,33 @@ class _Trace:
     def finish(self, status, solution, stats):
         pass
 
-    def as_dict(self):
-        return {"heads": self.heads, "parents": self.parents, "scores": self.scores, "flags": self.flags}
+    def as_bytes(self):
+        """b"ZTR1", u32 count, then heads u16, parents i32, scores f64, flags u8.
+
+        Little-endian; each array starts on a multiple of its item size so the Arena can
+        read it in place. engineCore.decodeTrace is the reader.
+        """
+        out = bytearray(b"ZTR1")
+        out += struct.pack("<I", len(self.heads))
+        for part, align in ((self.heads, 2), (self.parents, 4), (self.scores, 8), (self.flags, 1)):
+            _pad(out, align)
+            if sys.byteorder != "little":
+                part = array.array(part.typecode, part)
+                part.byteswap()
+            out += part.tobytes()
+        return bytes(out)
+
+
+_LAST_TRACE = None
 
 
 def _run(board_json, max_expansions, time_limit):
+    """JSON result; the search log is left in _LAST_TRACE as bytes for the worker to transfer."""
+    global _LAST_TRACE
     from zipcomp.engine import best_score_search
     from zipcomp.game import Board
 
+    _LAST_TRACE = None
     if _scorer is None or _tiebreaker is None:
         return json.dumps({"status": "error", "error": "Run the checks first.", "path": [], "stats": {}})
     board = Board.from_dict(json.loads(board_json))
@@ -334,20 +360,20 @@ def _run(board_json, max_expansions, time_limit):
         line = _line_of(exc, "search.py")
         where = _where(exc, "search.py") if line else _where(exc, "tiebreaker.py")
         path = trace.node.path if trace.node is not None else []
+        _LAST_TRACE = trace.as_bytes()
         return json.dumps({
             "status": "error",
             "error": where,
             "path": [list(board.rc(c)) for c in path],
-            "stats": {},
-            "trace": trace.as_dict(),
+            "stats": {"expansions": len(trace.heads)},
         })
     solution = stats.get("solution")
     path = solution if solution else (trace.node.path if trace.node is not None else [])
     clean = {k: v for k, v in stats.items() if k != "solution"}
+    _LAST_TRACE = trace.as_bytes()
     return json.dumps({
         "status": stats["status"],
         "error": None,
         "path": [list(board.rc(c)) for c in path],
         "stats": clean,
-        "trace": trace.as_dict(),
     })

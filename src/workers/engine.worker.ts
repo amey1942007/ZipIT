@@ -5,9 +5,14 @@ import helpersInitSource from '@/workers/zipcomp/helpers_init.py?raw'
 import helpersPrimitivesSource from '@/workers/zipcomp/helpers_primitives.py?raw'
 import { lockdown } from '@/workers/lockdown'
 
+interface PyBytes {
+  toJs: () => Uint8Array
+  destroy: () => void
+}
+
 interface PyProxy {
   runPython: (code: string) => unknown
-  globals: { set: (name: string, value: unknown) => void }
+  globals: { set: (name: string, value: unknown) => void; get: (name: string) => unknown }
 }
 
 type LoadPyodide = (opts: {
@@ -32,7 +37,7 @@ interface InMessage {
 }
 
 const scope = self as unknown as {
-  postMessage: (data: unknown) => void
+  postMessage: (data: unknown, transfer?: Transferable[]) => void
   onmessage: ((event: MessageEvent<unknown>) => void) | null
 }
 
@@ -41,6 +46,18 @@ let py: PyProxy | null = null
 
 function post(message: unknown) {
   scope.postMessage(JSON.parse(JSON.stringify(message)))
+}
+
+/** Copies _LAST_TRACE out of Python into a buffer of its own, so it can be transferred. */
+function takeTrace(active: PyProxy): Uint8Array | null {
+  const proxy = active.globals.get('_LAST_TRACE') as PyBytes | null | undefined
+  if (!proxy || typeof proxy.toJs !== 'function') return null
+  try {
+    return proxy.toJs().slice()
+  } finally {
+    proxy.destroy()
+    active.runPython('_LAST_TRACE = None')
+  }
 }
 
 function discard(): (chunk: string) => void {
@@ -125,7 +142,10 @@ scope.onmessage = (event: MessageEvent<unknown>) => {
     const maxExpansions = Math.max(1, Math.min(Number(message.maxExpansions) || 200_000, 2_000_000))
     const timeLimit = Math.max(0.1, Math.min(Number(message.timeLimit) || 20, 60))
     const result = JSON.parse(String(active.runPython(`_run(_BOARD_JSON, ${maxExpansions}, ${timeLimit})`))) as unknown
-    post({ type: 'ran', id: message.id, checks, result })
+    const trace = takeTrace(active)
+    const reply = JSON.parse(JSON.stringify({ type: 'ran', id: message.id, checks, result })) as Record<string, unknown>
+    if (trace) scope.postMessage({ ...reply, trace }, [trace.buffer])
+    else scope.postMessage(reply)
   } catch (err) {
     post({ type: 'failed', id: message.id, error: errorText(err) })
   }

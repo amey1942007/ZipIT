@@ -82,3 +82,9 @@ Writing `status` or `score` refreshes the leaderboard and prunes old runs automa
 The Arena loads Python in a Web Worker from a self-hosted Pyodide 314.0.7 runtime. Those files are not committed. `scripts/fetch-pyodide.mjs` copies the browser runtime out of the pinned `pyodide` npm package into `public/pyodide/314.0.7/` on `postinstall` and again before `vite build`. Vite then publishes that directory with the site, so the worker never uses a CDN. `public/pyodide/` is gitignored.
 
 The copied files are `pyodide.mjs`, `pyodide.asm.mjs`, `pyodide.asm.wasm`, `python_stdlib.zip`, and `pyodide-lock.json` (about 13 MB). The npm package is the version pin; committing the wasm as well would duplicate it in git history.
+
+## Arena runs and saved replays
+
+Arena runs go up to 1,000,000 expansions or 60 s, above the scorer's 200,000 expansions or 20 s per board, so teams can see where a slow search ends up. Past 20 s, a red alert says the board likely won't count. When the run ends over either scorer limit, a "Won't count on the scorer" alert lists the reasons. Expansion counts match the scorer exactly; times are browser estimates.
+
+Each run's full search log is saved as a gzipped binary file in the private `replays` bucket, with a row in `arena_replays` (migration 013). Only runs in a team's BEST, 2ND, 3RD and LATEST slots keep replays, two per submission (`current` and `previous`). That is at most 8 per team. `save_arena_replay` rotates them and deletes rows for submissions that left the slots. Deleted rows queue their files in `storage_purge_queue`, and `zipit-replay-orphan-sweep` removes uploads that never got a row. Measured files range from under 1 KB to about 400 KB (171,077 expansions). The bucket caps each file at 20 MB.

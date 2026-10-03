@@ -1,11 +1,30 @@
 import type { ReplayStep } from '@/arena/replayContract'
 import { cellIndex, cellRc, type ZipPuzzle } from '@/lib/zip/types'
 
-/** Same limits as ZipIt_ARIES config/engine.json. */
+/** Same limits as ZipIt_ARIES config/engine.json: what the scorer grades against. */
 export const ENGINE_MAX_EXPANSIONS = 200_000
 export const ENGINE_TIME_LIMIT_S = 20
 /** The engine checks its clock every 1024 expansions; this catches a score() that never returns. */
 export const ENGINE_HARD_TIMEOUT_MS = 35_000
+
+export interface EngineLimits {
+  maxExpansions: number
+  timeLimitS: number
+  hardTimeoutMs: number
+}
+
+export const GRADING_LIMITS: EngineLimits = {
+  maxExpansions: ENGINE_MAX_EXPANSIONS,
+  timeLimitS: ENGINE_TIME_LIMIT_S,
+  hardTimeoutMs: ENGINE_HARD_TIMEOUT_MS,
+}
+
+/** The Arena keeps going past the grading limits so a team can see where a slow search ends up. */
+export const ARENA_LIMITS: EngineLimits = {
+  maxExpansions: 1_000_000,
+  timeLimitS: 60,
+  hardTimeoutMs: 75_000,
+}
 
 export type CheckId = 'syntax' | 'imports' | 'classes' | 'output' | 'smoke'
 export const CHECK_ORDER: CheckId[] = ['syntax', 'imports', 'classes', 'output', 'smoke']
@@ -38,7 +57,7 @@ export interface EngineStats {
 
 /** Every expansion in engine order. Index k is the node the engine expanded k-th (its eid). */
 export interface EngineTrace {
-  heads: Int32Array
+  heads: Uint16Array
   /** Index of the expansion this node grew from; -1 for the start node. Always < k. */
   parents: Int32Array
   /** score() of the node; NaN when it was not a finite number. */
@@ -58,6 +77,8 @@ export interface EngineResult {
   solved: boolean
   stats: EngineStats
   trace: EngineTrace | null
+  /** The engine's binary search log, exactly as decoded into trace. Saved replays store these bytes. */
+  traceBytes: Uint8Array | null
 }
 
 export interface SubmissionCode {
@@ -73,14 +94,18 @@ export interface EngineBoard {
   walls: number[][][]
 }
 
-export const STATUS_LABELS: Record<EngineStatus, string> = {
-  solved: 'Solved',
-  exhausted: 'No path found',
-  expansion_limit: `Stopped at ${ENGINE_MAX_EXPANSIONS.toLocaleString('en-IN')} expansions`,
-  time_limit: `Stopped at the ${ENGINE_TIME_LIMIT_S} s limit`,
-  error: 'Crashed',
-  timeout: 'Timed out',
+export function statusLabels(limits: EngineLimits): Record<EngineStatus, string> {
+  return {
+    solved: 'Solved',
+    exhausted: 'No path found',
+    expansion_limit: `Stopped at ${limits.maxExpansions.toLocaleString('en-IN')} expansions`,
+    time_limit: `Stopped at the ${limits.timeLimitS} s limit`,
+    error: 'Crashed',
+    timeout: 'Timed out',
+  }
 }
+
+export const STATUS_LABELS = statusLabels(GRADING_LIMITS)
 
 export function puzzleToBoard(puzzle: ZipPuzzle, id = 'arena'): EngineBoard {
   const walls: number[][][] = []
@@ -142,53 +167,63 @@ export function asChecks(value: unknown): CheckResult[] {
     .map((item) => ({ id: item.id, ok: item.ok === true, message: String(item.message ?? '').slice(0, 400) }))
 }
 
+const STATUSES = Object.keys(STATUS_LABELS) as EngineStatus[]
+
 /** Validates the worker's reply on the main thread; a "solved" path that breaks the rules is an error. */
-export function asResult(value: unknown, puzzle: ZipPuzzle): EngineResult {
-  const raw = (value ?? {}) as { status?: string; error?: string | null; path?: unknown; stats?: EngineStats; trace?: unknown }
-  const status = (Object.keys(STATUS_LABELS) as EngineStatus[]).includes(raw.status as EngineStatus)
-    ? (raw.status as EngineStatus)
-    : 'error'
+export function asResult(value: unknown, puzzle: ZipPuzzle, traceBytes: Uint8Array | null = null): EngineResult {
+  const raw = (value ?? {}) as { status?: string; error?: string | null; path?: unknown; stats?: EngineStats }
+  const status = STATUSES.includes(raw.status as EngineStatus) ? (raw.status as EngineStatus) : 'error'
   const path = Array.isArray(raw.path)
     ? raw.path
         .filter((rc): rc is number[] => Array.isArray(rc) && rc.length === 2 && rc.every(Number.isInteger))
         .map(([r, c]) => cellIndex(r!, c!, puzzle.cols))
     : []
   const solved = status === 'solved' && validSolution(puzzle, path)
+  const trace = traceBytes ? decodeTrace(traceBytes, puzzle.rows * puzzle.cols) : null
   return {
     status: status === 'solved' && !solved ? 'error' : status,
     error: status === 'solved' && !solved ? 'The engine reported a path that breaks the rules.' : (raw.error ?? null),
     path,
     solved,
     stats: raw.stats && typeof raw.stats === 'object' ? raw.stats : {},
-    trace: asTrace(raw.trace, puzzle.rows * puzzle.cols),
+    trace,
+    traceBytes: trace ? traceBytes : null,
   }
 }
 
-/** Null unless every array lines up and every parent points at an earlier expansion. */
-export function asTrace(value: unknown, cells: number): EngineTrace | null {
-  if (!value || typeof value !== 'object') return null
-  const raw = value as { heads?: unknown; parents?: unknown; scores?: unknown; flags?: unknown }
-  const { heads, parents, scores, flags } = raw
-  if (!Array.isArray(heads) || !Array.isArray(parents) || !Array.isArray(scores) || !Array.isArray(flags)) return null
-  const size = heads.length
-  if (size === 0 || parents.length !== size || scores.length !== size || flags.length !== size) return null
+const TRACE_MAGIC = [0x5a, 0x54, 0x52, 0x31] // "ZTR1"
+
+const align = (offset: number, size: number) => Math.ceil(offset / size) * size
+
+/** Byte layout written by zipit_runtime._Trace.as_bytes. */
+export function traceLayout(size: number) {
+  const heads = 8
+  const parents = align(heads + 2 * size, 4)
+  const scores = align(parents + 4 * size, 8)
+  const flags = scores + 8 * size
+  return { heads, parents, scores, flags, total: flags + size }
+}
+
+/** Null unless the header, lengths, cells and parent order all check out. */
+export function decodeTrace(bytes: Uint8Array, cells: number): EngineTrace | null {
+  if (bytes.byteLength < 8 || TRACE_MAGIC.some((value, i) => bytes[i] !== value)) return null
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const size = view.getUint32(4, true)
+  const layout = traceLayout(size)
+  if (size === 0 || bytes.byteLength !== layout.total) return null
+  const own = bytes.byteOffset % 8 === 0 ? bytes : bytes.slice()
+  const base = own.byteOffset
   const trace: EngineTrace = {
-    heads: new Int32Array(size),
-    parents: new Int32Array(size),
-    scores: new Float64Array(size),
-    flags: new Uint8Array(size),
+    heads: new Uint16Array(own.buffer, base + layout.heads, size),
+    parents: new Int32Array(own.buffer, base + layout.parents, size),
+    scores: new Float64Array(own.buffer, base + layout.scores, size),
+    flags: new Uint8Array(own.buffer, base + layout.flags, size),
   }
   for (let k = 0; k < size; k++) {
-    const head = heads[k] as number
-    const parent = parents[k] as number
-    const flag = flags[k] as number
-    if (!Number.isInteger(head) || head < 0 || head >= cells) return null
-    if (!Number.isInteger(parent) || parent < -1 || parent >= k || (parent === -1 && k !== 0)) return null
-    if (!Number.isInteger(flag) || flag < 0 || flag > 3) return null
-    trace.heads[k] = head
-    trace.parents[k] = parent
-    trace.flags[k] = flag
-    trace.scores[k] = typeof scores[k] === 'number' ? scores[k] : Number.NaN
+    const parent = trace.parents[k]!
+    if (trace.heads[k]! >= cells) return null
+    if (parent < -1 || parent >= k || (parent === -1) !== (k === 0)) return null
+    if (trace.flags[k]! > 3) return null
   }
   return trace
 }

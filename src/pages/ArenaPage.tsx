@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
+  ARENA_LIMITS,
   CHECK_LABELS,
   CHECK_ORDER,
   checksPassed,
   EngineClient,
   formatElapsed,
-  STATUS_LABELS,
+  GRADING_LIMITS,
+  statusLabels,
   type CheckResult,
   type EngineResult,
   type SubmissionCode,
 } from '@/arena/engine'
+import { gradingVerdict } from '@/arena/grading'
 import { indexTrace, traceFrame, type TraceFrame, type TraceIndex } from '@/arena/trace'
+import { fetchArenaReplays, replayKeepIds, saveArenaReplay, type SavedReplay } from '@/lib/arenaReplays'
 import { DEFAULT_GRID, GRID_SIZES, SPEEDS, SPEED_STEPS_PER_S } from '@/config/site'
 import { useCellSize } from '@/components/arena/useCellSize'
 import { ZipBoard } from '@/components/arena/ZipBoard'
@@ -30,12 +34,20 @@ import { generatePuzzle, type GeneratedPuzzle } from '@/lib/zip/generate'
 const HISTORY_SIZE = 2
 /** Autoplay picks the slowest speed that shows the whole search in about this long. */
 const AUTOPLAY_TARGET_S = 20
+const ARENA_STATUS = statusLabels(ARENA_LIMITS)
+const GRADING_CAP = GRADING_LIMITS.maxExpansions.toLocaleString('en-IN')
 
 interface ZipEntry {
   key: number
   puzzle: GeneratedPuzzle
   result: EngineResult | null
   trace: TraceIndex | null
+}
+
+interface SaveTarget {
+  teamId: string
+  submissionId: string
+  keep: string[]
 }
 
 function autoSpeed(frames: number): (typeof SPEEDS)[number] {
@@ -59,7 +71,12 @@ function finalFrame(puzzle: GeneratedPuzzle, result: EngineResult | null): Trace
 function stepText(frame: TraceFrame, index: number, traced: boolean): string {
   if (!traced) return '—'
   const kind = index === 0 ? 'Start on dot 1' : frame.jumped ? 'Backtracked: jumped to another branch' : 'Extended the path'
-  return frame.tie ? `${kind} · the tie-breaker decided` : kind
+  const tie = frame.tie ? `${kind} · the tie-breaker decided` : kind
+  return index >= GRADING_LIMITS.maxExpansions ? `${tie} · past the scorer's ${GRADING_CAP} limit` : tie
+}
+
+function savedEntry(key: number, replay: SavedReplay): ZipEntry {
+  return { key, puzzle: replay.puzzle, result: replay.result, trace: replay.result.trace ? indexTrace(replay.result.trace) : null }
 }
 
 function chipState(id: (typeof CHECK_ORDER)[number], checks: CheckResult[] | null): 'idle' | 'ok' | 'bad' {
@@ -92,6 +109,10 @@ export function ArenaPage() {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1)
   const [grid, setGrid] = useState<number>(DEFAULT_GRID)
   const [note, setNote] = useState('')
+  const [saveNote, setSaveNote] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  const [clock, setClock] = useState(0)
   const [boardSlot, setBoardSlot] = useState<HTMLDivElement | null>(null)
   const engine = useRef<EngineClient | null>(null)
   const keyRef = useRef(0)
@@ -107,6 +128,16 @@ export function ArenaPage() {
     return rows.find((row) => row.id === submissionId) ?? (submissionId ? null : rows[0]!)
   }, [rows, submissionId])
   const missing = Boolean(rows && submissionId && !selected)
+  const ownRun = Boolean(selected && team && !isAdmin && !viewOnly && selected.team_id === team.id)
+  const saveTarget = useMemo<SaveTarget | null>(() => {
+    if (!ownRun || !selected || !rows || !team) return null
+    const keep = replayKeepIds(rows)
+    return keep.includes(selected.id) ? { teamId: team.id, submissionId: selected.id, keep } : null
+  }, [ownRun, selected, rows, team])
+  const saveTargetRef = useRef(saveTarget)
+  useEffect(() => {
+    saveTargetRef.current = saveTarget
+  }, [saveTarget])
   const [shownId, setShownId] = useState<string | null>(null)
   if ((selected?.id ?? null) !== shownId) {
     setShownId(selected?.id ?? null)
@@ -115,6 +146,7 @@ export function ArenaPage() {
     setHistory([])
     setShowPrevious(false)
     setPlaying(false)
+    setSaveNote('')
     if (selected) setNote('Loading the submission…')
   }
 
@@ -148,9 +180,17 @@ export function ArenaPage() {
     }
   }, [teamId])
 
+  useEffect(() => {
+    if (runStartedAt == null) return
+    const timer = window.setInterval(() => setClock(Date.now()), 500)
+    return () => window.clearInterval(timer)
+  }, [runStartedAt])
+
   const runOn = useCallback(async (source: SubmissionCode, size: number) => {
     const client = engine.current
     if (!client) return
+    const target = saveTargetRef.current
+    const load = loadRef.current
     let generated: GeneratedPuzzle
     try {
       generated = generatePuzzle({ seed: Date.now() >>> 0, rows: size, cols: size, timeBudgetMs: 2500 })
@@ -164,9 +204,14 @@ export function ArenaPage() {
     setIndex(0)
     setPlaying(false)
     setBusy(true)
+    setSaveNote('')
+    const started = Date.now()
+    setClock(started)
+    setRunStartedAt(started)
     setNote('Running your code on this Zip…')
-    const reply = await client.run(source, generated)
+    const reply = await client.run(source, generated, ARENA_LIMITS)
     setBusy(false)
+    setRunStartedAt(null)
     if (reply.checks.length) setChecks(reply.checks)
     if (reply.error) {
       setNote(reply.error)
@@ -188,31 +233,61 @@ export function ArenaPage() {
     } else if (typeof expansions === 'number' && expansions !== trace.size) {
       setNote(`The search log has ${trace.size} of ${expansions} expansions.`)
     } else if (!result.solved) {
-      setNote(`${STATUS_LABELS[result.status]}. Every expansion is shown: scrub back to see where the search went wrong.`)
+      setNote(`${ARENA_STATUS[result.status]}. Every expansion is shown: scrub back to see where the search went wrong.`)
     } else {
       setNote('')
     }
+    if (!target || !result.traceBytes) return
+    setSaveNote('Saving this replay…')
+    let saved: string
+    try {
+      await saveArenaReplay({ ...target, puzzle: generated, result })
+      saved = 'Replay saved. It loads here next time.'
+    } catch (error) {
+      saved = error instanceof Error ? error.message : "Couldn't save this replay."
+    }
+    if (load === loadRef.current) setSaveNote(saved)
   }, [])
 
   useEffect(() => {
     if (!selected) return
     const load = ++loadRef.current
     let stop = false
+    const current = () => !stop && load === loadRef.current
+    const saved = fetchArenaReplays(selected.id).catch(() => ({ replays: [] as SavedReplay[], missing: -1 }))
     void downloadSubmissionFiles(selected)
       .then(async (files) => {
-        if (stop || load !== loadRef.current) return
+        if (!current()) return
         setCode(files)
-        setBusy(true)
+        const { replays, missing } = await saved
+        if (!current()) return
+        const kept = replays.slice(-HISTORY_SIZE)
+        const latest = kept[kept.length - 1]
+        if (latest) {
+          const entries = kept.map((replay) => savedEntry(++keyRef.current, replay))
+          const size = entries[entries.length - 1]!.trace?.size ?? 0
+          setHistory(entries)
+          setShowPrevious(false)
+          setIndex(0)
+          setSpeed(autoSpeed(size))
+          setPlaying(size > 1)
+          setSaveNote(
+            `Saved replay from ${formatIst(latest.createdAt, true)}.${missing > 0 ? ' One saved replay could not be loaded.' : ''} New Zip runs your code on a fresh board.`,
+          )
+        } else if (missing !== 0) {
+          setSaveNote(missing < 0 ? "Couldn't load the saved replays." : 'A saved replay could not be loaded.')
+        }
+        setChecking(true)
         setNote('Starting Python and checking your code…')
         const reply = await engine.current?.check(files)
-        if (stop || load !== loadRef.current || !reply) return
-        setBusy(false)
+        if (!current() || !reply) return
+        setChecking(false)
         setChecks(reply.checks)
         if (reply.error) {
           setNote(reply.error)
           return
         }
-        if (!checksPassed(reply.checks)) {
+        if (!checksPassed(reply.checks) || latest) {
           setNote('')
           return
         }
@@ -220,7 +295,7 @@ export function ArenaPage() {
       })
       .catch(() => {
         if (!stop) {
-          setBusy(false)
+          setChecking(false)
           setNote('Could not download this submission.')
         }
       })
@@ -261,6 +336,10 @@ export function ArenaPage() {
     if (code && checksPassed(checks)) void runOn(code, grid)
   }
 
+  const runningFor = runStartedAt == null ? 0 : Math.max(0, (clock - runStartedAt) / 1000)
+  const verdict = result && !busy ? gradingVerdict(result, ARENA_LIMITS) : null
+  const saveHint =
+    ownRun && !saveTarget ? 'Replays are saved only for the runs in your BEST, 2ND, 3RD and LATEST slots.' : ''
   const playbackOff = frames <= 1 || busy
   const last = Math.max(frames - 1, 0)
   const solved = Boolean(result?.solved && frame && puzzle && frame.path.length === puzzle.rows * puzzle.cols)
@@ -296,6 +375,7 @@ export function ArenaPage() {
         ) : null}
       </div>
       {note ? <p className="text-text-muted">{note}</p> : null}
+      {saveNote || saveHint ? <p className="text-text-muted">{saveNote || saveHint}</p> : null}
       <div className="zi-arena">
         <div className="zi-arena-board">
           {missing ? (
@@ -365,7 +445,7 @@ export function ArenaPage() {
             {failed ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{failed.message}</p> : null}
             <HudReadout>PLAYBACK</HudReadout>
             <div className="grid gap-1 font-mono text-sm font-bold text-text-muted tabular-nums">
-              <p>Status: {busy ? 'Running…' : result ? STATUS_LABELS[result.status] : '—'}</p>
+              <p>Status: {busy ? `Running… ${Math.floor(runningFor)} s` : result ? ARENA_STATUS[result.status] : '—'}</p>
               <p>
                 Expansion:{' '}
                 {traced ? `${(Math.min(index, last) + 1).toLocaleString('en-IN')} of ${frames.toLocaleString('en-IN')}` : (stats.expansions ?? '—')}
@@ -388,7 +468,21 @@ export function ArenaPage() {
                 Each step is one node your code made the engine expand. Hatched cells are the branch it last gave up.
               </p>
             ) : null}
-            {result?.error ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{result.error}</p> : null}
+            {busy && runningFor > GRADING_LIMITS.timeLimitS ? (
+              <p role="alert" className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">
+                Still running after {Math.floor(runningFor)} s. The scorer stops at {GRADING_LIMITS.timeLimitS} s, so this board
+                likely won&apos;t count. The Arena keeps going up to {ARENA_LIMITS.timeLimitS} s so you can see where the search
+                ends up.
+              </p>
+            ) : null}
+            {verdict && !verdict.counts ? (
+              <div role="alert" className="grid gap-1 bg-comic-red px-2 py-1 font-mono text-sm text-ivory">
+                <p className="font-bold">Won&apos;t count on the scorer</p>
+                {verdict.reasons.map((reason) => (
+                  <p key={reason}>{reason}</p>
+                ))}
+              </div>
+            ) : null}
             <p className="text-sm text-text-muted">Arena runs are practice only. Official scores come from the scorer.</p>
             <div className="flex flex-wrap gap-2">
               <ActionButton
@@ -471,7 +565,7 @@ export function ArenaPage() {
                   ))}
                 </select>
               </label>
-              <ActionButton type="button" onClick={newZip} disabled={busy || !code || !checksPassed(checks)}>
+              <ActionButton type="button" onClick={newZip} disabled={busy || checking || !code || !checksPassed(checks)}>
                 New Zip
               </ActionButton>
               <ActionButton
