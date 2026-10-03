@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { PASSWORD_MIN } from '@/config/site'
 import { ActionButton } from '@/components/comic/ActionButton'
 import { HudReadout } from '@/components/comic/HudReadout'
@@ -7,20 +7,41 @@ import { Panel } from '@/components/comic/Panel'
 import { PageFrame } from '@/components/PageFrame'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/lib/auth'
+import { useAuth, type TeamRow } from '@/lib/auth'
 import {
   AVATAR_PREPARING,
   AVATAR_SAVED,
   encodeAvatar,
 } from '@/lib/avatarEncode'
-import { avatarUrl, fetchSubmissions, removeAvatar, saveAvatar, updateTeamName, type SubmissionRow } from '@/lib/data'
+import {
+  avatarUrl,
+  fetchSubmissions,
+  fetchTeam,
+  removeAvatar,
+  resetTeamPassword,
+  saveAvatar,
+  updateTeamName,
+  type SubmissionRow,
+} from '@/lib/data'
 import { formatScore, initials } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import { rankOf, useTeamStats } from '@/lib/useTeamStats'
 import { useSubmissionFeed } from '@/lib/useLive'
 
 export function ProfilePage() {
-  const { team, refreshTeam } = useAuth()
+  const { team: own, isAdmin, refreshTeam } = useAuth()
+  const [searchParams] = useSearchParams()
+  const requested = isAdmin ? searchParams.get('team') : null
+  const targetId = requested && requested !== own?.id ? requested : null
+  const [target, setTarget] = useState<TeamRow | null>(null)
+  const reloadTarget = useCallback(async () => {
+    setTarget(targetId ? await fetchTeam(targetId) : null)
+  }, [targetId])
+  useEffect(() => {
+    void reloadTarget()
+  }, [reloadTarget])
+  const team = targetId ? target : own
+  const refresh = targetId ? reloadTarget : refreshTeam
   const [name, setName] = useState(team?.team_name ?? '')
   useEffect(() => {
     if (team) setName(team.team_name)
@@ -39,7 +60,7 @@ export function ProfilePage() {
   useEffect(() => {
     reloadRows()
   }, [reloadRows])
-  useSubmissionFeed(team?.id ?? null, reloadRows)
+  useSubmissionFeed(targetId ? null : (team?.id ?? null), reloadRows)
 
   async function onName(event: FormEvent) {
     event.preventDefault()
@@ -52,7 +73,7 @@ export function ProfilePage() {
     setBusy(true)
     try {
       await updateTeamName(team.id, next)
-      await refreshTeam()
+      await refresh()
       setNameMessage('Team name saved.')
     } catch (error) {
       setNameMessage(error instanceof Error ? error.message : 'Could not save the name.')
@@ -69,10 +90,19 @@ export function ProfilePage() {
       return
     }
     setBusy(true)
-    const { error } = await supabase.auth.updateUser({ password })
+    let failure: string | null = null
+    if (targetId && team) {
+      failure = await resetTeamPassword(team.username, password).then(
+        () => null,
+        (error: unknown) => (error instanceof Error ? error.message : "Couldn't update the password. Try again."),
+      )
+    } else {
+      const { error } = await supabase.auth.updateUser({ password })
+      failure = error ? error.message : null
+    }
     setBusy(false)
     setPassword('')
-    setPasswordMessage(error ? error.message : 'Password updated.')
+    setPasswordMessage(failure ?? 'Password updated.')
   }
 
   async function onAvatar(file: File | undefined) {
@@ -82,7 +112,7 @@ export function ProfilePage() {
     try {
       const encoded = await encodeAvatar(file)
       const saved = await saveAvatar(team.id, encoded.blob)
-      await refreshTeam()
+      await refresh()
       setAvatarMessage(`${AVATAR_SAVED} ${saved.avatar_path}`)
     } catch (error) {
       setAvatarMessage(error instanceof Error ? error.message : "Couldn't upload the image. Try again.")
@@ -94,7 +124,7 @@ export function ProfilePage() {
   const preview = avatarUrl(team?.avatar_path, team?.updated_at)
   const mine = team ? stats.rows.find((row) => row.team_id === team.id) : undefined
   const rank = rankOf(stats.rows, team?.id ?? null)
-  const submissionValue = !stats.loaded ? '—' : stats.submissions == null ? '—' : String(stats.submissions)
+  const submissionValue = !stats.loaded || targetId || stats.submissions == null ? '—' : String(stats.submissions)
 
   return (
     <PageFrame title="Profile">
@@ -175,7 +205,10 @@ export function ProfilePage() {
           type="file"
           accept="image/png,image/jpeg,image/webp"
           disabled={busy || !team}
-          onChange={(event) => void onAvatar(event.target.files?.[0])}
+          onChange={(event) => {
+            void onAvatar(event.target.files?.[0])
+            event.target.value = ''
+          }}
         />
         <ActionButton
           type="button"
@@ -185,9 +218,11 @@ export function ProfilePage() {
             if (!team) return
             setBusy(true)
             void removeAvatar(team.id)
-              .then(() => refreshTeam())
+              .then(() => refresh())
               .then(() => setAvatarMessage('Avatar removed.'))
-              .catch(() => setAvatarMessage("Couldn't upload the image. Try again."))
+              .catch((error: unknown) =>
+                setAvatarMessage(error instanceof Error ? error.message : "Couldn't remove the avatar. Try again."),
+              )
               .finally(() => setBusy(false))
           }}
         >

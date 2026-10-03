@@ -1,6 +1,6 @@
 import { AVATAR_CHECK_ERROR } from '@/lib/avatarEncode'
 import type { Tables } from '@/lib/database.types'
-import { friendlyDbError } from '@/lib/format'
+import { friendlyDbError, friendlyStorageError } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
 export type SubmissionRow = Tables<'submissions'>
@@ -51,11 +51,15 @@ export async function uploadSubmission(teamId: string, file: File): Promise<Subm
   if (!supabase) throw new Error('backend')
   const id = crypto.randomUUID()
   const filePath = `${teamId}/${id}.py`
-  const up = await supabase.storage.from('submissions').upload(filePath, file, {
+  // The bucket only accepts text/x-python, and browsers report .py files inconsistently.
+  const body = new Blob([file], { type: 'text/x-python' })
+  const up = await supabase.storage.from('submissions').upload(filePath, body, {
     contentType: 'text/x-python',
     upsert: false,
   })
-  if (up.error) throw up.error
+  if (up.error) {
+    throw new Error(friendlyStorageError(up.error) ?? 'Upload failed. Check your connection and try again.')
+  }
   const inserted = await supabase
     .from('submissions')
     .insert({
@@ -99,17 +103,42 @@ export async function saveAvatar(teamId: string, blob: Blob): Promise<{ avatar_p
 export async function removeAvatar(teamId: string): Promise<void> {
   if (!supabase) return
   const path = `${teamId}/avatar.webp`
-  await supabase.storage.from('avatars').remove([path])
-  await supabase.from('teams').update({ avatar_path: null }).eq('id', teamId)
+  const removed = await supabase.storage.from('avatars').remove([path])
+  if (removed.error) throw new Error("Couldn't remove the avatar. Try again.")
+  const updated = await supabase.from('teams').update({ avatar_path: null }).eq('id', teamId).select('id')
+  if (updated.error || !updated.data?.length) throw new Error("Couldn't remove the avatar. Try again.")
 }
 
 export async function updateTeamName(teamId: string, teamName: string): Promise<void> {
   if (!supabase) throw new Error('backend')
-  const { error } = await supabase.from('teams').update({ team_name: teamName }).eq('id', teamId)
+  const { data, error } = await supabase.from('teams').update({ team_name: teamName }).eq('id', teamId).select('id')
   if (error) {
     if (/unique|duplicate|already/i.test(error.message)) throw new Error('Another team already uses that name.')
+    if (error.code === '23514') throw new Error('Use 2 to 40 characters for the team name.')
     throw new Error(error.message)
   }
+  // RLS turns a blocked update into zero rows, not an error.
+  if (!data?.length) throw new Error("Couldn't save the name. Try again.")
+}
+
+export async function fetchTeam(teamId: string): Promise<Tables<'teams'> | null> {
+  if (!supabase) return null
+  const { data } = await supabase.from('teams').select('*').eq('id', teamId).maybeSingle()
+  return data
+}
+
+/** Admin only: the edge function checks the caller's JWT and only resets team accounts. */
+export async function resetTeamPassword(username: string, password: string): Promise<void> {
+  if (!supabase) throw new Error('backend')
+  const { error } = await supabase.functions.invoke('admin-manage-teams', {
+    body: { action: 'reset_password', username, password },
+  })
+  if (!error) return
+  const context = (error as { context?: Response }).context
+  const payload = context ? ((await context.json().catch(() => ({}))) as { error?: string }) : {}
+  if (payload.error === 'invalid_password') throw new Error('Use at least 8 characters.')
+  if (payload.error === 'not_a_team_account') throw new Error('Only team passwords can be reset here.')
+  throw new Error("Couldn't update the password. Try again.")
 }
 
 export async function downloadSubmission(path: string): Promise<string> {

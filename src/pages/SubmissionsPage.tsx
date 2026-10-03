@@ -10,7 +10,7 @@ import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Sfx } from '@/components/comic/Sfx'
 import { useAuth } from '@/lib/auth'
 import { fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
-import { formatIst, formatScore } from '@/lib/format'
+import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore } from '@/lib/format'
 import { buildSlots } from '@/lib/slots'
 import { uploadCheckList } from '@/lib/uploadChecks'
 import { playZipped } from '@/lib/sfx'
@@ -18,7 +18,7 @@ import { isSupabaseConfigured } from '@/lib/supabase'
 import { useSubmissionFeed } from '@/lib/useLive'
 
 export function SubmissionsPage() {
-  const { team } = useAuth()
+  const { team, isAdmin } = useAuth()
   const [rows, setRows] = useState<SubmissionRow[]>([])
   const [message, setMessage] = useState('')
   const [outcome, setOutcome] = useState<'ok' | 'error' | null>(null)
@@ -42,6 +42,13 @@ export function SubmissionsPage() {
 
   async function take(list: File[]) {
     if (!team && isSupabaseConfigured) return
+    if (isAdmin) {
+      setChecks(null)
+      setPreview([])
+      setOutcome('error')
+      setMessage(ADMIN_SUBMIT_MESSAGE)
+      return
+    }
     const file = list[0]
     const report = uploadCheckList({
       names: list.map((item) => item.name),

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AVATAR_CONVERT_ERROR, AVATAR_TYPE_ERROR, encodeAvatar, isWebpRiff } from '@/lib/avatarEncode'
 import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broadcast'
-import { friendlyDbError, initials, loginEmail } from '@/lib/format'
+import { friendlyDbError, friendlyStorageError, initials, loginEmail } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
 import { buildSlots } from '@/lib/slots'
 import { firstUploadError, uploadCheckList } from '@/lib/uploadChecks'
@@ -50,6 +50,18 @@ describe('database errors', () => {
     expect(friendlyDbError({ code: 'P0001', message: 'queue_full: 3' })).toMatch(/queue is full/)
     expect(friendlyDbError({ code: '42501', message: 'new row violates' })).toMatch(/wasn't accepted/)
     expect(friendlyDbError({ code: '23514', message: 'teams_avatar_path_own' })).toMatch(/avatar/)
+  })
+
+  it('never shows raw storage errors', () => {
+    expect(friendlyStorageError({ message: 'new row violates row-level security policy', statusCode: '403' })).toMatch(
+      /wasn't accepted/,
+    )
+    expect(friendlyStorageError({ message: 'mime type text/plain is not supported', statusCode: '415' })).toMatch(/\.py/)
+    expect(friendlyStorageError({ message: 'The object exceeded the maximum allowed size', statusCode: '413' })).toMatch(
+      /256 KB/,
+    )
+    expect(friendlyStorageError({ message: 'socket hang up' })).toBeNull()
+    expect(friendlyStorageError(null)).toBeNull()
   })
 })
 
