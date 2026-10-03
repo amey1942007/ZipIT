@@ -3,7 +3,7 @@ import { AVATAR_CONVERT_ERROR, AVATAR_TYPE_ERROR, encodeAvatar, isWebpRiff } fro
 import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broadcast'
 import { friendlyDbError, friendlyStorageError, initials, loginEmail, metricsLine } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
-import { buildSlots } from '@/lib/slots'
+import { buildSlots, slotStatusText } from '@/lib/slots'
 import { firstUploadError, pairFiles, uploadCheckList } from '@/lib/uploadChecks'
 
 const webp = new Uint8Array([
@@ -110,6 +110,20 @@ describe('slots', () => {
     const first = buildSlots([row('new', 'running', null, '2026-10-02T10:00:00Z')])
     expect(first[0]?.firstScoring).toBe(true)
     expect(first[3]?.firstScoring).toBe(true)
+  })
+
+  it('never shows a queued run as being scored', () => {
+    const queued = buildSlots([row('new', 'queued', null, '2026-10-02T10:00:00Z')])
+    expect(slotStatusText(queued[0]!)).toBe('Queued · waiting for the scorer')
+    expect(slotStatusText(queued[3]!)).toBe('Queued · waiting for the scorer')
+    const running = buildSlots([row('new', 'running', null, '2026-10-02T10:00:00Z')])
+    expect(slotStatusText(running[3]!)).toBe('Scoring…')
+    const behind = buildSlots([
+      row('late', 'scored', 10, '2026-10-02T10:00:00Z'),
+      row('new', 'queued', null, '2026-10-02T12:00:00Z'),
+    ])
+    expect(slotStatusText(behind[3]!)).toBe('Scored · a newer run is in the scoring queue')
+    expect(slotStatusText(behind[0]!)).toBe('Scored')
   })
 })
 
