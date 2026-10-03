@@ -10,7 +10,7 @@ import { StampOverlay } from '@/components/comic/BurstPortal'
 import { Sfx } from '@/components/comic/Sfx'
 import { useAuth } from '@/lib/auth'
 import { QUEUE_CAP } from '@/config/site'
-import { fetchQueueDepth, fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
+import { fetchQueueDepth, fetchSubmissions, uploadSubmission, withdrawSubmission, type SubmissionRow } from '@/lib/data'
 import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore, metricsLine } from '@/lib/format'
 import { buildSlots, slotStatusText } from '@/lib/slots'
 import { pairFiles, uploadCheckList } from '@/lib/uploadChecks'
@@ -32,6 +32,8 @@ export function SubmissionsPage() {
   const [preview, setPreview] = useState<string[]>([])
   const [staged, setStaged] = useState<StagedSubmission | null>(() => readStaged())
   const [queue, setQueue] = useState<number | null>(null)
+  const [withdrawing, setWithdrawing] = useState<string | null>(null)
+  const [listNote, setListNote] = useState<{ text: string; error: boolean } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refreshQueue = useCallback(() => {
@@ -105,6 +107,21 @@ export function SubmissionsPage() {
       refreshQueue()
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function withdraw(row: SubmissionRow) {
+    if (!window.confirm(`Withdraw ${row.file_name}? It leaves the scoring queue and both files are deleted.`)) return
+    setWithdrawing(row.id)
+    setListNote(null)
+    try {
+      await withdrawSubmission(row.id)
+      setListNote({ text: `Withdrew ${row.file_name}. Its queue slot is free.`, error: false })
+    } catch (error) {
+      setListNote({ text: error instanceof Error ? error.message : "Couldn't withdraw the run.", error: true })
+    } finally {
+      setWithdrawing(null)
+      reload()
     }
   }
 
@@ -300,6 +317,11 @@ export function SubmissionsPage() {
       <Panel fill="plain">
         <div className="grid gap-2 p-4 text-ivory">
           <HudReadout>TEAM SUBMISSIONS</HudReadout>
+          {listNote ? (
+            <p role={listNote.error ? 'alert' : 'status'} className={listNote.error ? 'bg-comic-red px-2 py-1 text-ivory' : ''}>
+              {listNote.text}
+            </p>
+          ) : null}
           {rows.length === 0 ? (
             <p>No submissions yet.</p>
           ) : (
@@ -311,6 +333,16 @@ export function SubmissionsPage() {
                   {row.status === 'scored' ? (
                     <ActionButton to={`/arena/${row.id}`} variant="ghost">
                       Replay
+                    </ActionButton>
+                  ) : null}
+                  {row.status === 'queued' && !isAdmin ? (
+                    <ActionButton
+                      variant="ghost"
+                      disabled={withdrawing !== null}
+                      aria-label={`Withdraw ${row.file_name}`}
+                      onClick={() => void withdraw(row)}
+                    >
+                      {withdrawing === row.id ? 'Withdrawing…' : 'Withdraw'}
                     </ActionButton>
                   ) : null}
                 </li>

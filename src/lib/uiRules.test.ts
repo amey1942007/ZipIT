@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AVATAR_CONVERT_ERROR, AVATAR_TYPE_ERROR, encodeAvatar, isWebpRiff } from '@/lib/avatarEncode'
 import { parseSubmissionBroadcast, resetBroadcastLogForTests } from '@/lib/broadcast'
-import { friendlyDbError, friendlyStorageError, initials, loginEmail, metricsLine } from '@/lib/format'
+import { friendlyDbError, friendlyStorageError, friendlyWithdrawError, initials, loginEmail, metricsLine } from '@/lib/format'
 import { compareRanking, tiedScore } from '@/lib/ranking'
 import { buildSlots, slotStatusText } from '@/lib/slots'
 import { firstUploadError, pairFiles, uploadCheckList } from '@/lib/uploadChecks'
@@ -65,6 +65,13 @@ describe('database errors', () => {
     expect(friendlyDbError({ code: 'P0001', message: 'queue_full: 3' })).toMatch(/queue is full/)
     expect(friendlyDbError({ code: '42501', message: 'new row violates' })).toMatch(/wasn't accepted/)
     expect(friendlyDbError({ code: '23514', message: 'teams_avatar_path_own' })).toMatch(/avatar/)
+  })
+
+  it('explains withdraw refusals', () => {
+    expect(friendlyWithdrawError({ code: '55000', message: 'not_queued: submission is running' })).toMatch(/already picked/)
+    expect(friendlyWithdrawError({ code: 'P0002', message: 'not_found: no such submission' })).toMatch(/already gone/)
+    expect(friendlyWithdrawError({ code: '42501', message: 'not_team' })).toMatch(/team accounts/)
+    expect(friendlyWithdrawError({ code: '08006', message: 'fetch failed' })).toMatch(/connection/)
   })
 
   it('never shows raw storage errors', () => {

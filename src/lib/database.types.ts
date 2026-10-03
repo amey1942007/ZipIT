@@ -282,6 +282,7 @@ export type Database = {
         }[]
       }
       verify_purge_secret: { Args: { p: string }; Returns: boolean }
+      withdraw_submission: { Args: { p_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
