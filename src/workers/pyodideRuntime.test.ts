@@ -6,6 +6,16 @@ import gameSource from '@/workers/zipcomp/game.py?raw'
 import helpersInitSource from '@/workers/zipcomp/helpers_init.py?raw'
 import helpersPrimitivesSource from '@/workers/zipcomp/helpers_primitives.py?raw'
 import { SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE } from '@/playground/templates'
+import { puzzleToBoard } from '@/arena/engineCore'
+import {
+  BOARD_REFERENCE,
+  EXAMPLE_PATH,
+  EXAMPLE_PUZZLE,
+  HELPER_DOCS,
+  NODE_REFERENCE,
+  RETURN_REFERENCE,
+  type RefEntry,
+} from '@/playground/reference'
 
 interface PyodideProbe {
   runPython: (code: string) => unknown
@@ -169,6 +179,54 @@ json.dumps(out)
     expect(
       failed('class Score:\n    def score(self, node, board):\n        return 0\n    def prune(self, node, board):\n        return node.depth > 1\n'),
     ).toMatchObject({ id: 'smoke', message: expect.stringMatching(/warm-up/) })
+  })
+
+  it('shows the Playground reference values the engine really produces', () => {
+    const entries: RefEntry[] = [
+      ...[...BOARD_REFERENCE, ...NODE_REFERENCE, ...RETURN_REFERENCE].flatMap((section) => section.entries),
+      ...HELPER_DOCS.flatMap((doc) => doc.examples),
+    ]
+    py.globals.set('_REF_BOARD', JSON.stringify(puzzleToBoard(EXAMPLE_PUZZLE, 'example')))
+    py.globals.set('_REF_PATH', JSON.stringify(EXAMPLE_PATH))
+    py.globals.set('_REF_EXPRS', JSON.stringify(entries.map((entry) => entry.expr)))
+    const actual = JSON.parse(
+      String(
+        py.runPython(`
+import json
+import helpers
+from zipcomp.game import Board
+
+_b = Board.from_dict(json.loads(_REF_BOARD))
+_path = json.loads(_REF_PATH)
+assert _path[0] == _b.start
+_n = _b.start_node()
+for _cell in _path[1:]:
+    _n = next(c for c in _b.successors(_n) if c.head == _cell)
+_ns = {"board": _b, "node": _n, **{k: getattr(helpers, k) for k in helpers.__all__}}
+_out = {}
+for _expr in json.loads(_REF_EXPRS):
+    try:
+        _out[_expr] = repr(eval(_expr, dict(_ns)))
+    except Exception as exc:
+        _out[_expr] = "ERROR " + repr(exc)
+json.dumps(_out)
+`),
+      ),
+    ) as Record<string, string>
+    const squash = (text: string) => text.replace(/\s+/g, '')
+    for (const entry of entries) {
+      expect({ expr: entry.expr, value: squash(actual[entry.expr] ?? '') }).toEqual({
+        expr: entry.expr,
+        value: squash(entry.value),
+      })
+    }
+    expect(entries.length).toBeGreaterThan(40)
+    const exported = JSON.parse(String(py.runPython('import helpers, json; json.dumps(sorted(helpers.__all__))')))
+    expect(HELPER_DOCS.map((doc) => doc.name).sort()).toEqual(exported)
+    for (const doc of HELPER_DOCS) {
+      expect(doc.source.startsWith(`def ${doc.name}(`)).toBe(true)
+      expect(doc.signature.startsWith(`${doc.name}(`)).toBe(true)
+    }
   })
 
   it('matches CPython expansion counts on the same boards', () => {
