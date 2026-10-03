@@ -23,6 +23,21 @@ export interface SlotModel {
 
 const LABELS: SlotLabel[] = ['BEST', '2ND', '3RD']
 
+const STATUS_TEXT: Record<string, string> = {
+  queued: 'Queued · waiting for the scorer',
+  running: 'Scoring…',
+  scored: 'Scored',
+  failed: 'Failed',
+}
+
+/** Only "running" means the scorer has picked the run up; "queued" must never read as in progress. */
+export function slotStatusText(slot: SlotModel): string {
+  const status = slot.submission?.status ?? ''
+  const text = STATUS_TEXT[status] ?? status
+  if (slot.scoring && (status === 'scored' || status === 'failed')) return `${text} · a newer run is in the scoring queue`
+  return text
+}
+
 function byScore(a: SlotSubmission, b: SlotSubmission): number {
   const score = (b.score ?? 0) - (a.score ?? 0)
   if (score !== 0) return score

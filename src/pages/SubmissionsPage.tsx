@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth'
 import { QUEUE_CAP } from '@/config/site'
 import { fetchQueueDepth, fetchSubmissions, uploadSubmission, type SubmissionRow } from '@/lib/data'
 import { ADMIN_SUBMIT_MESSAGE, formatIst, formatScore, metricsLine } from '@/lib/format'
-import { buildSlots } from '@/lib/slots'
+import { buildSlots, slotStatusText } from '@/lib/slots'
 import { pairFiles, uploadCheckList } from '@/lib/uploadChecks'
 import { playZipped } from '@/lib/sfx'
 import { clearStaged, readStaged, STAGED_DRAG_TYPE, stagedFiles, type StagedSubmission } from '@/lib/stagedSubmission'
@@ -92,7 +92,7 @@ export function SubmissionsPage() {
     try {
       await uploadSubmission(team.id, pair, source)
       setOutcome('ok')
-      setMessage('Uploaded. Scoring will update this page.')
+      setMessage('Uploaded and queued. The score shows here once the scorer finishes it. You can already run it in the Arena.')
       playZipped()
       if (source === 'playground') {
         clearStaged()
@@ -239,7 +239,7 @@ export function SubmissionsPage() {
                 <CaptionBox className="zi-stamp">
                   <p className="font-display text-2xl font-bold">
                     ZIPPED! ·{' '}
-                    <span className="text-comic-red">{isSupabaseConfigured ? 'queued for Arena' : 'preview'}</span>
+                    <span className="text-comic-red">{isSupabaseConfigured ? 'queued for scoring' : 'preview'}</span>
                   </p>
                   <p>{message}</p>
                 </CaptionBox>
@@ -278,7 +278,7 @@ export function SubmissionsPage() {
               ) : (
                 <>
                   <p className="truncate font-mono text-[15px] font-bold">{slot.submission.file_name}</p>
-                  <p>{slot.scoring ? 'Scoring…' : slot.submission.status}</p>
+                  <p>{slotStatusText(slot)}</p>
                   <p className="font-display text-[40px] font-bold text-gold tabular-nums">{formatScore(slot.submission.score)}</p>
                   {metricsLine(slot.submission.metrics) ? (
                     <p className="font-mono text-xs font-bold tabular-nums">{metricsLine(slot.submission.metrics)}</p>
