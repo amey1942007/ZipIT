@@ -3,11 +3,36 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { EditorView } from '@codemirror/view'
+import type { CheckResult } from '@/arena/engineCore'
 import { readStaged } from '@/lib/stagedSubmission'
 import { PlaygroundPage } from '@/pages/PlaygroundPage'
 import { SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE } from '@/playground/templates'
 
-const DRAFTS_KEY = 'zipit.playground-drafts.v1'
+const engine = vi.hoisted(() => ({ checks: [] as CheckResult[], calls: 0 }))
+
+vi.mock('@/arena/engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/arena/engine')>()
+  class FakeEngineClient {
+    async check() {
+      engine.calls += 1
+      return { checks: engine.checks, error: null }
+    }
+    async run() {
+      return { checks: engine.checks, result: null, error: null }
+    }
+    dispose() {}
+  }
+  return { ...actual, EngineClient: FakeEngineClient }
+})
+
+const DRAFTS_KEY = 'zipit.playground-drafts.v2'
+const ALL_OK: CheckResult[] = ['syntax', 'imports', 'classes', 'output', 'smoke'].map((id) => ({
+  id: id as CheckResult['id'],
+  ok: true,
+  message: '',
+}))
+const SEARCH_CODE = 'class Score:\n    def score(self, node, board):\n        return node.depth\n'
+const TIEBREAKER_CODE = 'class TieBreaker:\n    def key(self, node, board):\n        return (node.head,)\n'
 
 function renderPage() {
   return render(
@@ -27,6 +52,16 @@ async function editorFor(name: string): Promise<{ content: HTMLElement; view: Ed
   return { content, view }
 }
 
+function replace(view: EditorView, text: string) {
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
+}
+
+async function writeBoth(user: ReturnType<typeof userEvent.setup>) {
+  replace((await editorFor('search.py')).view, SEARCH_CODE)
+  await user.click(screen.getByRole('tab', { name: 'tiebreaker.py' }))
+  replace((await editorFor('tiebreaker.py')).view, TIEBREAKER_CODE)
+}
+
 function savedDrafts(): Record<string, string> {
   return JSON.parse(window.localStorage.getItem(DRAFTS_KEY) ?? '{}') as Record<string, string>
 }
@@ -35,20 +70,24 @@ describe('code playground', () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.sessionStorage.clear()
+    engine.checks = ALL_OK
+    engine.calls = 0
   })
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
   })
 
-  it('starts both tabs from the template and uses the comic panels and tabs', async () => {
+  it('starts from a skeleton that is not a solution, inside the comic panels and tabs', async () => {
     renderPage()
     const { view } = await editorFor('search.py')
     expect(view.state.doc.toString()).toBe(SEARCH_TEMPLATE)
+    expect(SEARCH_TEMPLATE).toContain('raise NotImplementedError')
+    expect(TIEBREAKER_TEMPLATE).toContain('raise NotImplementedError')
+    expect(SEARCH_TEMPLATE).not.toMatch(/from helpers import/)
     expect(screen.getByText('PLAYGROUND · PANEL 1/2')).toBeInTheDocument()
     expect(screen.getByText('EDITOR · PANEL 2/2')).toBeInTheDocument()
-    const tab = screen.getByRole('tab', { name: 'search.py' })
-    expect(tab).toHaveClass('zi-tab', 'zi-tab-active')
+    expect(screen.getByRole('tab', { name: 'search.py' })).toHaveClass('zi-tab', 'zi-tab-active')
     expect(screen.getByRole('tab', { name: 'tiebreaker.py' })).toHaveClass('zi-tab', 'zi-tab-idle')
     expect(document.querySelector('.zi-codebox .cm-editor')).not.toBeNull()
   })
@@ -82,7 +121,7 @@ describe('code playground', () => {
     const user = userEvent.setup()
     renderPage()
     const { view } = await editorFor('search.py')
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'x = 1\n' } })
+    replace(view, 'x = 1\n')
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     await user.click(screen.getByRole('button', { name: 'Reset to template' }))
     expect((await editorFor('search.py')).view.state.doc.toString()).toBe('x = 1\n')
@@ -92,14 +131,42 @@ describe('code playground', () => {
     expect(savedDrafts()['search.py']).toBe(SEARCH_TEMPLATE)
   })
 
-  it('stages both files and opens Submissions', async () => {
+  it('refuses to submit the untouched template', async () => {
     renderPage()
-    const { view } = await editorFor('search.py')
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'class Score:\n    pass\n' } })
+    await editorFor('search.py')
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText(/Write your own code first: search\.py and tiebreaker\.py are still/)).toBeInTheDocument()
+    expect(screen.queryByText('Submissions page')).not.toBeInTheDocument()
+    expect(readStaged()).toBeNull()
+    expect(engine.calls).toBe(0)
+  })
+
+  it('refuses to submit when a check fails', async () => {
+    const user = userEvent.setup()
+    engine.checks = [
+      { id: 'syntax', ok: true, message: '' },
+      { id: 'imports', ok: true, message: '' },
+      { id: 'classes', ok: true, message: '' },
+      { id: 'output', ok: false, message: 'search.py line 3: ZeroDivisionError' },
+    ]
+    renderPage()
+    await writeBoth(user)
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Fix the failed check before submitting.')).toBeInTheDocument()
+    expect(screen.getByText('search.py line 3: ZeroDivisionError')).toBeInTheDocument()
+    expect(screen.queryByText('Submissions page')).not.toBeInTheDocument()
+    expect(readStaged()).toBeNull()
+  })
+
+  it('stages both files and opens Submissions once every check passes', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await writeBoth(user)
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
     expect(await screen.findByText('Submissions page')).toBeInTheDocument()
+    expect(engine.calls).toBe(1)
     const staged = readStaged()
-    expect(staged?.search).toBe('class Score:\n    pass\n')
-    expect(staged?.tiebreaker).toBe(TIEBREAKER_TEMPLATE)
+    expect(staged?.search).toBe(SEARCH_CODE)
+    expect(staged?.tiebreaker).toBe(TIEBREAKER_CODE)
   })
 })

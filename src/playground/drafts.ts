@@ -1,6 +1,6 @@
 import { TEMPLATES, type PlaygroundFile } from '@/playground/templates'
 
-const KEY = 'zipit.playground-drafts.v1'
+const KEY = 'zipit.playground-drafts.v2'
 const MAX_CHARS = 262_144
 
 export type Drafts = Record<PlaygroundFile, string>
