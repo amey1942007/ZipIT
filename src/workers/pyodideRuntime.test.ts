@@ -131,8 +131,15 @@ json.dumps(out)
     expect(checks.every((item) => item.ok)).toBe(true)
   })
 
-  it('passes the Playground starter templates', () => {
-    expect(check(SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE).every((item) => item.ok)).toBe(true)
+  it('rejects the untouched Playground starter templates', () => {
+    expect(failed(SEARCH_TEMPLATE, TIEBREAKER_TEMPLATE)).toMatchObject({
+      id: 'output',
+      message: expect.stringMatching(/^search\.py line \d+: NotImplementedError: write your heuristic here/),
+    })
+    expect(failed(SEARCH, TIEBREAKER_TEMPLATE)).toMatchObject({
+      id: 'output',
+      message: expect.stringMatching(/^tiebreaker\.py line \d+: NotImplementedError/),
+    })
   })
 
   it('reports each kind of problem with the file and line', () => {

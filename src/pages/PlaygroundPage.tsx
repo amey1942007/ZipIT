@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import {
   CHECK_LABELS,
   CHECK_ORDER,
+  checksPassed,
   EngineClient,
   formatElapsed,
   pathSteps,
@@ -23,7 +24,7 @@ import { PageFrame } from '@/components/PageFrame'
 import type { CodeEditorProps } from '@/components/playground/CodeEditor'
 import { DEFAULT_GRID } from '@/config/site'
 import { downloadDraft, loadDrafts, saveDrafts, templateDrafts, type Drafts } from '@/playground/drafts'
-import { PLAYGROUND_FILES, type PlaygroundFile } from '@/playground/templates'
+import { isUnchanged, PLAYGROUND_FILES, type PlaygroundFile } from '@/playground/templates'
 import { stageSubmission } from '@/lib/stagedSubmission'
 import { SEARCH_FILE, TIEBREAKER_FILE } from '@/lib/uploadChecks'
 import { generatePuzzle, type GeneratedPuzzle } from '@/lib/zip/generate'
@@ -143,9 +144,31 @@ export function PlaygroundPage() {
     for (const name of PLAYGROUND_FILES) downloadDraft(name, draftsRef.current[name])
   }
 
-  function submit() {
+  async function submit() {
+    const client = engine.current
+    if (!client || busy) return
     saveNow()
-    stageSubmission(draftsRef.current[SEARCH_FILE], draftsRef.current[TIEBREAKER_FILE])
+    const code = { search: draftsRef.current[SEARCH_FILE], tiebreaker: draftsRef.current[TIEBREAKER_FILE] }
+    const untouched = PLAYGROUND_FILES.filter((name) => isUnchanged(name, draftsRef.current[name]))
+    if (untouched.length) {
+      setNote(`Write your own code first: ${untouched.join(' and ')} ${untouched.length > 1 ? 'are' : 'is'} still the starter template.`)
+      return
+    }
+    setBusy(true)
+    setNote('Checking your code before submitting…')
+    const reply = await client.check(code)
+    setBusy(false)
+    setChecks(reply.checks.length ? reply.checks : null)
+    if (reply.error) {
+      setNote(reply.error)
+      return
+    }
+    if (!checksPassed(reply.checks)) {
+      setNote('Fix the failed check before submitting.')
+      return
+    }
+    setNote('')
+    stageSubmission(code.search, code.tiebreaker)
     navigate('/submissions')
   }
 
@@ -235,7 +258,7 @@ export function PlaygroundPage() {
               <ActionButton type="button" variant="ghost" onClick={download}>
                 Download
               </ActionButton>
-              <ActionButton type="button" variant="ghost" disabled={busy} onClick={submit}>
+              <ActionButton type="button" variant="ghost" disabled={busy} onClick={() => void submit()}>
                 Submit
               </ActionButton>
               <ActionButton type="button" variant="ghost" disabled={busy} onClick={reset}>
