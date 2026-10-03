@@ -1,7 +1,7 @@
 import { AVATAR_CHECK_ERROR } from '@/lib/avatarEncode'
 import type { Tables } from '@/lib/database.types'
 import { QUEUE_CAP } from '@/config/site'
-import { friendlyDbError, friendlyStorageError, QUEUE_FULL_MESSAGE } from '@/lib/format'
+import { friendlyDbError, friendlyStorageError, friendlyWithdrawError, QUEUE_FULL_MESSAGE } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 
 export type SubmissionRow = Tables<'submissions'>
@@ -101,6 +101,13 @@ export async function uploadSubmission(
     .single()
   if (inserted.error) throw new Error(friendlyDbError(inserted.error) ?? UPLOAD_FAILED)
   return inserted.data
+}
+
+/** Deletes the caller's own submission while it is still queued. The database refuses anything else. */
+export async function withdrawSubmission(id: string): Promise<void> {
+  if (!supabase) throw new Error('backend')
+  const { error } = await supabase.rpc('withdraw_submission', { p_id: id })
+  if (error) throw new Error(friendlyWithdrawError(error))
 }
 
 export async function downloadSubmissionFiles(row: Pick<SubmissionRow, 'file_path' | 'tiebreaker_path'>): Promise<{

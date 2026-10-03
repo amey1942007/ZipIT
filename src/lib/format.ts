@@ -71,6 +71,16 @@ export function friendlyDbError(error: { code?: string; message?: string } | nul
   return null
 }
 
+export function friendlyWithdrawError(error: { code?: string; message?: string }): string {
+  const message = error.message ?? ''
+  if (error.code === '55000' || message.startsWith('not_queued')) {
+    return 'The scorer already picked this run up, so it can no longer be withdrawn.'
+  }
+  if (error.code === 'P0002' || message.startsWith('not_found')) return 'That submission is already gone.'
+  if (error.code === '42501' || message.startsWith('not_team')) return 'Only team accounts can withdraw runs.'
+  return "Couldn't withdraw the run. Check your connection and try again."
+}
+
 /** "Solved 18/20 · 4.21 s" from the scorer's metrics, or null when it hasn't reported them. */
 export function metricsLine(metrics: unknown): string | null {
   if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) return null
