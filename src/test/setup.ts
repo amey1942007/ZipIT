@@ -13,3 +13,9 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
       dispatchEvent: () => false,
     }) as MediaQueryList
 }
+
+// jsdom has no layout; CodeMirror measures text through Range rects.
+if (typeof Range !== 'undefined') {
+  Range.prototype.getClientRects ??= () => Object.assign([], { item: () => null }) as unknown as DOMRectList
+  Range.prototype.getBoundingClientRect ??= () => new DOMRect()
+}

@@ -111,6 +111,11 @@ export function pathSteps(path: readonly number[], cols: number): ReplayStep[] {
   })
 }
 
+export function formatElapsed(seconds: number | undefined): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return '—'
+  return seconds < 1 ? `${(seconds * 1000).toFixed(1)} ms` : `${seconds.toFixed(2)} s`
+}
+
 export function checksPassed(checks: readonly CheckResult[] | null): boolean {
   return Boolean(checks && checks.length === CHECK_ORDER.length && checks.every((item) => item.ok))
 }

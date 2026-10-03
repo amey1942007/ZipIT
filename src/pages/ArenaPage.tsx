@@ -5,6 +5,7 @@ import {
   CHECK_ORDER,
   checksPassed,
   EngineClient,
+  formatElapsed,
   pathSteps,
   STATUS_LABELS,
   type CheckResult,
@@ -231,8 +232,12 @@ export function ArenaPage() {
       {rows && rows.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-4 py-3">
           No submissions yet.{' '}
+          <Link to="/playground" className="font-semibold text-gold">
+            Write search.py and tiebreaker.py in the Playground
+          </Link>{' '}
+          or{' '}
           <Link to="/submissions" className="font-semibold text-gold">
-            Upload search.py and tiebreaker.py
+            upload them
           </Link>{' '}
           to run them here.
         </p>
@@ -324,7 +329,7 @@ export function ArenaPage() {
               </p>
               <p>Expansions: {stats.expansions ?? '—'}</p>
               <p>Backtracks: {stats.backtracks ?? '—'}</p>
-              <p>Time: {typeof stats.elapsed === 'number' ? `${stats.elapsed.toFixed(2)} s` : '—'}</p>
+              <p>Time: {formatElapsed(stats.elapsed)}</p>
             </div>
             {result?.error ? <p className="bg-comic-red px-2 py-1 font-mono text-sm text-ivory">{result.error}</p> : null}
             <p className="text-sm text-text-muted">Arena runs are practice only. Official scores come from the scorer.</p>

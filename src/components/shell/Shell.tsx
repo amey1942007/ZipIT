@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import {
   ChartColumn,
-  ExternalLink,
+  Code,
   FileCheck,
   Grid3x3,
   House,
@@ -10,7 +10,7 @@ import {
   Shield,
   User,
 } from 'lucide-react'
-import { CODE_PLAYGROUND_URL, ORGANISER_LINE, ORGANISER_SUBLINE } from '@/config/site'
+import { ORGANISER_LINE, ORGANISER_SUBLINE } from '@/config/site'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +58,6 @@ export function CodePlaygroundButton({
 }) {
   const label = compact ? 'Playground' : 'Code Playground'
   const classes = cn('zi-abtn zi-abtn-primary relative', hero ? 'zi-abtn-hero' : 'zi-abtn', className)
-  const href = CODE_PLAYGROUND_URL || 'about:blank'
   const pop = (event: { currentTarget: HTMLElement }) => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const el = event.currentTarget
@@ -67,11 +66,10 @@ export function CodePlaygroundButton({
     el.classList.add('zi-squash')
   }
   return (
-    <a className={classes} href={href} target="_blank" rel="noopener noreferrer" onClick={pop}>
+    <Link className={classes} to="/playground" onClick={pop}>
       {label}
-      <ExternalLink aria-hidden className="size-4" />
-      <span className="sr-only">(opens in a new tab)</span>
-    </a>
+      <Code aria-hidden className="size-4" />
+    </Link>
   )
 }
 
@@ -198,11 +196,8 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
                     <DropdownMenuItem onClick={() => navigate('/profile')}>
                       <User /> Profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <a href={CODE_PLAYGROUND_URL || 'about:blank'} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink /> Code Playground
-                        <span className="sr-only">(opens in a new tab)</span>
-                      </a>
+                    <DropdownMenuItem onClick={() => navigate('/playground')}>
+                      <Code /> Code Playground
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

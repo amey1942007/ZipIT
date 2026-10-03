@@ -20,14 +20,12 @@ Other scripts: `npm run typecheck`, `npm run lint`, `npm test -- --run`, `npm ru
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` for local development. All three names are optional for a local build. If either Supabase value is missing, the build still succeeds and the app shows **backend not configured** instead of crashing.
+Copy `.env.example` to `.env.local` for local development. Both names are optional for a local build. If either Supabase value is missing, the build still succeeds and the app shows **backend not configured** instead of crashing.
 
 | Name | Purpose |
 | --- | --- |
 | `VITE_SUPABASE_URL` | Supabase project URL (`https://uvnmysivplivpvdcbbtp.supabase.co`). Public by design. Read from the environment at build time; it is not hard-coded in the client. |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key. Public by design. Set it in the environment or as an Actions variable. Do not commit the key. |
-| `VITE_PLAYGROUND_URL` | Placeholder link for the Code Playground button. |
-
 Never commit `.env`, `.env.local`, a service-role key, or any scorer credential. The browser only ever receives the publishable key, and only because Vite inlines `VITE_*` variables at build time.
 
 ## GitHub Pages
@@ -39,7 +37,9 @@ An admin does this once. This repository does not change those settings.
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-`VITE_PLAYGROUND_URL` can be added as a variable later, when the playground link exists. The deploy workflow already passes the two Supabase variables into the build. A missing variable does not fail the build.
+The deploy workflow already passes the two Supabase variables into the build. A missing variable does not fail the build.
+
+The Code Playground (`/playground`) is part of the app. It runs the same in-browser checks as the Arena and hands both files to the Submissions page.
 
 Pushes to `main` run `.github/workflows/deploy.yml`. Pull requests run `.github/workflows/ci.yml` (install, typecheck, lint, test, build) with read-only permissions.
 

@@ -11,6 +11,7 @@ import { HomePage } from '@/pages/HomePage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { PlaygroundPage } from '@/pages/PlaygroundPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { SubmissionsPage } from '@/pages/SubmissionsPage'
 
@@ -47,6 +48,7 @@ function RoutedApp() {
           <Route element={<ShellLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/playground" element={<PlaygroundPage />} />
             <Route element={<RequireSession />}>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/submissions" element={<SubmissionsPage />} />

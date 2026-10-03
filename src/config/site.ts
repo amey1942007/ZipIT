@@ -1,5 +1,4 @@
 /** Site constants. Pending items in the UI spec stay placeholders or flags. */
-export const CODE_PLAYGROUND_URL = (import.meta.env.VITE_PLAYGROUND_URL ?? '').trim()
 export const ORGANISER_LINE = 'ARIESxROBOTICSxEES'
 export const ORGANISER_SUBLINE = 'Fresher Tech GC, IIT Delhi'
 export const TAGLINE = '[Tagline placeholder]'
