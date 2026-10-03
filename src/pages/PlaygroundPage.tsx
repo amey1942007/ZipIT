@@ -22,6 +22,8 @@ import { HudReadout } from '@/components/comic/HudReadout'
 import { Panel } from '@/components/comic/Panel'
 import { PageFrame } from '@/components/PageFrame'
 import type { CodeEditorProps } from '@/components/playground/CodeEditor'
+import { HelperList } from '@/components/playground/HelperList'
+import { InputsReference } from '@/components/playground/InputsReference'
 import { DEFAULT_GRID } from '@/config/site'
 import { downloadDraft, loadDrafts, saveDrafts, templateDrafts, type Drafts } from '@/playground/drafts'
 import { isUnchanged, PLAYGROUND_FILES, type PlaygroundFile } from '@/playground/templates'
@@ -34,17 +36,6 @@ const CodeEditor = lazy(() => import('@/components/playground/CodeEditor')) as u
 >
 
 const AUTOSAVE_MS = 600
-
-const HELPERS = [
-  'manhattan(board, a, b)',
-  'bfs_distance(board, src, dst, node)',
-  'next_checkpoint(node, board)',
-  'next_manhattan(node, board)',
-  'unvisited_neighbors(node, board)',
-  'free_degree(node, board)',
-  'unvisited_component_size(node, board)',
-  'trapped_unvisited(node, board)',
-]
 
 function chipState(id: (typeof CHECK_ORDER)[number], checks: CheckResult[] | null): 'idle' | 'ok' | 'bad' {
   const found = checks?.find((item) => item.id === id)
@@ -66,6 +57,7 @@ export function PlaygroundPage() {
   const [boardSlot, setBoardSlot] = useState<HTMLDivElement | null>(null)
   const engine = useRef<EngineClient | null>(null)
   const draftsRef = useRef(drafts)
+  const referenceRef = useRef<HTMLDivElement>(null)
   const cell = useCellSize(puzzle?.cols ?? DEFAULT_GRID, boardSlot)
 
   useEffect(() => {
@@ -188,12 +180,16 @@ export function PlaygroundPage() {
               <li>Limits: 200,000 expansions or 20 s per board.</li>
             </ul>
             <div className="grid gap-2">
-              <HudReadout>HELPERS</HudReadout>
-              <ul className="grid gap-0.5 font-mono text-[13px] font-bold">
-                {HELPERS.map((name) => (
-                  <li key={name}>{name}</li>
-                ))}
-              </ul>
+              <HudReadout>HELPERS · HOVER OR TAP FOR CODE</HudReadout>
+              <HelperList />
+              <ActionButton
+                type="button"
+                variant="ghost"
+                className="w-fit"
+                onClick={() => referenceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                What node &amp; board look like ↓
+              </ActionButton>
             </div>
             <div className="grid gap-2">
               <HudReadout>CHECKS</HudReadout>
@@ -310,6 +306,7 @@ export function PlaygroundPage() {
           </Panel>
         </div>
       ) : null}
+      <InputsReference ref={referenceRef} />
     </PageFrame>
   )
 }

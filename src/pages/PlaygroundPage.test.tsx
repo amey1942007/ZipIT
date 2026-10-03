@@ -158,6 +158,34 @@ describe('code playground', () => {
     expect(readStaged()).toBeNull()
   })
 
+  it('opens a helper card with its real source on hover and closes it on Escape', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const trigger = screen.getByRole('button', { name: 'bfs_distance(board, src, dst, visited=None)' })
+    await user.hover(trigger)
+    const card = await screen.findByRole('region', { name: 'bfs_distance helper' })
+    expect(card).toHaveTextContent(/shortest real walk/i)
+    expect(card).toHaveTextContent('def bfs_distance(board, src, dst, visited=None) -> int | None:')
+    expect(card).toHaveTextContent('bfs_distance(board, 5, 7, node) → 4')
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    trigger.focus()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'bfs_distance helper' })).toBeNull())
+  })
+
+  it('shows real node and board values in the reference tabs', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    expect(screen.getByText('WHAT YOUR CODE RECEIVES')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'board' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('[(0, 0), (1, 3), (3, 0)]')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'node' }))
+    expect(screen.getByText('node.visited')).toBeInTheDocument()
+    expect(screen.getByText('[0, 1, 5]')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'what to return' }))
+    expect(screen.getByText('(-free_degree(node, board), node.head)')).toBeInTheDocument()
+  })
+
   it('stages both files and opens Submissions once every check passes', async () => {
     const user = userEvent.setup()
     renderPage()
